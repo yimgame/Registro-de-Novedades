@@ -65,10 +65,108 @@
           <button type="button" class="tab-btn" data-tab="records">Registros</button>
           <button type="button" class="tab-btn" data-tab="users">Usuarios</button>
           <button type="button" class="tab-btn" data-tab="policy">Politica</button>
+          <button type="button" class="tab-btn" data-tab="notifications">Notificaciones</button>
           <button type="button" class="tab-btn" data-tab="permissions">Permisos</button>
           <button type="button" class="tab-btn" data-tab="audit">Auditoria</button>
           <button type="button" class="tab-btn" data-tab="expiry">Vencimientos</button>
           <button type="button" class="tab-btn" data-tab="force-change">Cambio clave</button>
+        </div>
+      </section>
+
+      <section class="card hidden" id="notificationsCard" data-tab-panel="notifications">
+        <div class="section-head">
+          <h2>Notificaciones por mail</h2>
+        </div>
+
+        <div class="grid two">
+          <label>
+            <input type="checkbox" id="mail_enabled" />
+            Habilitar envio de mails en nuevos registros
+          </label>
+          <label>
+            <input type="checkbox" id="mail_smtp_use_tls" />
+            Usar STARTTLS
+          </label>
+        </div>
+
+        <div class="grid two">
+          <label>
+            <input type="checkbox" id="mail_smtp_use_ssl" />
+            Usar SSL directo
+          </label>
+          <div></div>
+        </div>
+
+        <div class="grid three">
+          <label>
+            SMTP host
+            <input type="text" id="mail_smtp_host" maxlength="200" placeholder="smtp.empresa.com" />
+          </label>
+          <label>
+            Puerto
+            <input type="number" id="mail_smtp_port" min="1" max="65535" placeholder="587" />
+          </label>
+          <label>
+            Usuario SMTP
+            <input type="text" id="mail_smtp_username" maxlength="200" placeholder="usuario@empresa.com" />
+          </label>
+        </div>
+
+        <div class="grid two">
+          <label>
+            Password SMTP (dejar vacio para conservar)
+            <input type="password" id="mail_smtp_password" maxlength="200" placeholder="Password SMTP" />
+          </label>
+          <label>
+            Desde (email)
+            <input type="text" id="mail_from_email" maxlength="200" placeholder="notificaciones@empresa.com" />
+          </label>
+        </div>
+
+        <div class="grid two">
+          <label>
+            Nombre remitente
+            <input type="text" id="mail_from_name" maxlength="120" placeholder="Registro de Novedades" />
+          </label>
+          <div></div>
+        </div>
+
+        <div class="grid two">
+          <label>
+            Destinatarios TO (separar con coma)
+            <textarea id="mail_to_addresses" rows="2" maxlength="1000" placeholder="a@empresa.com, b@empresa.com"></textarea>
+          </label>
+          <label>
+            Destinatarios CC (separar con coma)
+            <textarea id="mail_cc_addresses" rows="2" maxlength="1000" placeholder="c@empresa.com, d@empresa.com"></textarea>
+          </label>
+        </div>
+
+        <div class="grid two">
+          <label>
+            Asunto BLOQUEAR
+            <input type="text" id="mail_subject_bloquear" maxlength="200" />
+          </label>
+          <label>
+            Asunto DESBLOQUEAR
+            <input type="text" id="mail_subject_desbloquear" maxlength="200" />
+          </label>
+        </div>
+
+        <div class="grid two">
+          <label>
+            Asunto NOVEDAD
+            <input type="text" id="mail_subject_novedad" maxlength="200" />
+          </label>
+          <label>
+            Asunto INCIDENCIA
+            <input type="text" id="mail_subject_incidencia" maxlength="200" />
+          </label>
+        </div>
+
+        <div class="actions">
+          <button type="button" id="saveNotificationsBtn" class="ghost">Guardar notificaciones</button>
+          <button type="button" id="testNotificationBtn" class="ghost">Enviar prueba</button>
         </div>
       </section>
 

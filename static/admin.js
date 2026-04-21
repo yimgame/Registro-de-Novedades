@@ -24,7 +24,10 @@ const forceNewKeyInput = document.getElementById("force_new_key");
 const forceNewKey2Input = document.getElementById("force_new_key_2");
 const auditCard = document.getElementById("auditCard");
 const policyCard = document.getElementById("policyCard");
+const notificationsCard = document.getElementById("notificationsCard");
 const savePolicyBtn = document.getElementById("savePolicyBtn");
+const saveNotificationsBtn = document.getElementById("saveNotificationsBtn");
+const testNotificationBtn = document.getElementById("testNotificationBtn");
 const forceLegacyRotationBtn = document.getElementById("forceLegacyRotationBtn");
 const permissionsCard = document.getElementById("permissionsCard");
 const permissionsHeadEl = document.getElementById("permissionsHead");
@@ -47,6 +50,21 @@ const policyRequireUpperInput = document.getElementById("policy_require_uppercas
 const policyRequireLowerInput = document.getElementById("policy_require_lowercase");
 const policyRequireDigitInput = document.getElementById("policy_require_digit");
 const policyRequireSymbolInput = document.getElementById("policy_require_symbol");
+const mailEnabledInput = document.getElementById("mail_enabled");
+const mailSmtpUseTlsInput = document.getElementById("mail_smtp_use_tls");
+const mailSmtpUseSslInput = document.getElementById("mail_smtp_use_ssl");
+const mailSmtpHostInput = document.getElementById("mail_smtp_host");
+const mailSmtpPortInput = document.getElementById("mail_smtp_port");
+const mailSmtpUsernameInput = document.getElementById("mail_smtp_username");
+const mailSmtpPasswordInput = document.getElementById("mail_smtp_password");
+const mailFromEmailInput = document.getElementById("mail_from_email");
+const mailFromNameInput = document.getElementById("mail_from_name");
+const mailToAddressesInput = document.getElementById("mail_to_addresses");
+const mailCcAddressesInput = document.getElementById("mail_cc_addresses");
+const mailSubjectBloquearInput = document.getElementById("mail_subject_bloquear");
+const mailSubjectDesbloquearInput = document.getElementById("mail_subject_desbloquear");
+const mailSubjectNovedadInput = document.getElementById("mail_subject_novedad");
+const mailSubjectIncidenciaInput = document.getElementById("mail_subject_incidencia");
 
 let auth = {
   user: "",
@@ -65,6 +83,7 @@ const panelByTab = {
   records: recordsCard,
   users: usersCard,
   policy: policyCard,
+  notifications: notificationsCard,
   permissions: permissionsCard,
   audit: auditCard,
   expiry: expiryCard,
@@ -163,6 +182,7 @@ function getAvailableTabs() {
   }
   if (can("can_manage_policy")) {
     tabs.push("policy");
+    tabs.push("notifications");
   }
   if (can("can_manage_permissions")) {
     tabs.push("permissions");
@@ -250,6 +270,44 @@ function setPolicyInputs(policy) {
   policyRequireLowerInput.checked = Boolean(policy.require_lowercase);
   policyRequireDigitInput.checked = Boolean(policy.require_digit);
   policyRequireSymbolInput.checked = Boolean(policy.require_symbol);
+}
+
+function setNotificationInputs(settings) {
+  mailEnabledInput.checked = Boolean(settings.enabled);
+  mailSmtpUseTlsInput.checked = Boolean(settings.smtp_use_tls);
+  mailSmtpUseSslInput.checked = Boolean(settings.smtp_use_ssl);
+  mailSmtpHostInput.value = settings.smtp_host || "";
+  mailSmtpPortInput.value = Number(settings.smtp_port || 587);
+  mailSmtpUsernameInput.value = settings.smtp_username || "";
+  mailSmtpPasswordInput.value = "";
+  mailFromEmailInput.value = settings.from_email || "";
+  mailFromNameInput.value = settings.from_name || "";
+  mailToAddressesInput.value = settings.to_addresses || "";
+  mailCcAddressesInput.value = settings.cc_addresses || "";
+  mailSubjectBloquearInput.value = settings.subject_bloquear || "";
+  mailSubjectDesbloquearInput.value = settings.subject_desbloquear || "";
+  mailSubjectNovedadInput.value = settings.subject_novedad || "";
+  mailSubjectIncidenciaInput.value = settings.subject_incidencia || "";
+}
+
+function buildNotificationPayload() {
+  return {
+    enabled: mailEnabledInput.checked,
+    smtp_use_tls: mailSmtpUseTlsInput.checked,
+    smtp_use_ssl: mailSmtpUseSslInput.checked,
+    smtp_host: mailSmtpHostInput.value.trim(),
+    smtp_port: Number(mailSmtpPortInput.value || 587),
+    smtp_username: mailSmtpUsernameInput.value.trim(),
+    smtp_password: mailSmtpPasswordInput.value,
+    from_email: mailFromEmailInput.value.trim(),
+    from_name: mailFromNameInput.value.trim(),
+    to_addresses: mailToAddressesInput.value.trim(),
+    cc_addresses: mailCcAddressesInput.value.trim(),
+    subject_bloquear: mailSubjectBloquearInput.value.trim(),
+    subject_desbloquear: mailSubjectDesbloquearInput.value.trim(),
+    subject_novedad: mailSubjectNovedadInput.value.trim(),
+    subject_incidencia: mailSubjectIncidenciaInput.value.trim(),
+  };
 }
 
 async function loadMeta() {
@@ -576,6 +634,22 @@ async function loadPolicy() {
   setPolicyInputs(policy);
 }
 
+async function loadNotifications() {
+  if (!hasNormalAccess() || !can("can_manage_policy")) {
+    return;
+  }
+
+  const response = await fetch("/api/admin/notifications", {
+    headers: getAuthHeaders(),
+  });
+  if (!response.ok) {
+    return;
+  }
+
+  const settings = await response.json();
+  setNotificationInputs(settings);
+}
+
 async function savePolicy() {
   if (!hasNormalAccess() || !can("can_manage_policy")) {
     return;
@@ -606,6 +680,57 @@ async function savePolicy() {
   showStatus("Politica de claves actualizada.", "ok");
   await loadAudit();
   await loadPasswordHealth();
+}
+
+async function saveNotifications() {
+  if (!hasNormalAccess() || !can("can_manage_policy")) {
+    return;
+  }
+
+  const payload = buildNotificationPayload();
+  const response = await fetch("/api/admin/notifications", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+    body: JSON.stringify(payload),
+  });
+
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    showStatus(body.error || "No se pudo guardar configuracion de notificaciones.", "error");
+    return;
+  }
+
+  if (body.settings) {
+    setNotificationInputs(body.settings);
+  }
+  showStatus("Configuracion de notificaciones actualizada.", "ok");
+  await loadAudit();
+}
+
+async function testNotification() {
+  if (!hasNormalAccess() || !can("can_manage_policy")) {
+    return;
+  }
+
+  const actionType = (prompt("Tipo de prueba (BLOQUEAR, DESBLOQUEAR, NOVEDAD, INCIDENCIA)", "NOVEDAD") || "NOVEDAD").trim().toUpperCase();
+  if (!actionType) {
+    return;
+  }
+
+  const response = await fetch("/api/admin/notifications/test", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+    body: JSON.stringify({ action_type: actionType }),
+  });
+
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    showStatus(body.error || "No se pudo enviar mail de prueba.", "error");
+    return;
+  }
+
+  showStatus(body.message || "Mail de prueba enviado.", "ok");
+  await loadAudit();
 }
 
 async function forceLegacyRotation() {
@@ -936,6 +1061,7 @@ async function unlockPanel(user, key, options = {}) {
     await loadUsers();
     await loadAudit();
     await loadPolicy();
+    await loadNotifications();
     await loadPasswordHealth();
     await loadPermissions();
     return true;
@@ -1018,6 +1144,14 @@ function bootstrap() {
 
   savePolicyBtn.addEventListener("click", () => {
     savePolicy().catch((error) => showStatus(error.message || "Error guardando politica", "error"));
+  });
+
+  saveNotificationsBtn.addEventListener("click", () => {
+    saveNotifications().catch((error) => showStatus(error.message || "Error guardando notificaciones", "error"));
+  });
+
+  testNotificationBtn.addEventListener("click", () => {
+    testNotification().catch((error) => showStatus(error.message || "Error enviando prueba", "error"));
   });
 
   savePermissionsBtn.addEventListener("click", () => {

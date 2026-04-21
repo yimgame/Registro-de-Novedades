@@ -2,9 +2,11 @@ import hashlib
 import hmac
 import json
 import os
+import smtplib
 import subprocess
 import tempfile
 from datetime import datetime, timedelta, timezone
+from email.message import EmailMessage
 from io import BytesIO
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -128,6 +130,23 @@ DEFAULT_PASSWORD_POLICY = {
     "require_digit": True,
     "require_symbol": False,
     "expires_days": 90,
+}
+DEFAULT_NOTIFICATION_SETTINGS = {
+    "enabled": False,
+    "smtp_host": "",
+    "smtp_port": 587,
+    "smtp_username": "",
+    "smtp_password": "",
+    "smtp_use_tls": True,
+    "smtp_use_ssl": False,
+    "from_name": "Registro de Novedades",
+    "from_email": "",
+    "to_addresses": "",
+    "cc_addresses": "",
+    "subject_bloquear": "[Bloqueo] Nueva solicitud registrada",
+    "subject_desbloquear": "[Desbloqueo] Nueva solicitud registrada",
+    "subject_novedad": "[Novedad] Nueva solicitud registrada",
+    "subject_incidencia": "[Incidencia] Nueva solicitud registrada",
 }
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -685,6 +704,192 @@ def get_password_policy() -> dict:
     }
 
 
+def split_email_list(raw_value: str) -> list[str]:
+    text_value = safe_text(raw_value)
+    if not text_value:
+        return []
+
+    normalized = text_value.replace(";", ",")
+    values = []
+    for item in normalized.split(","):
+        email = safe_text(item).lower()
+        if email and email not in values:
+            values.append(email)
+    return values
+
+
+def parse_smtp_port(value: object, default: int = 587) -> int:
+    try:
+        port = int(str(value))
+    except (TypeError, ValueError):
+        return default
+    if 1 <= port <= 65535:
+        return port
+    return default
+
+
+def get_notification_settings(include_secret: bool = False) -> dict:
+    smtp_password = get_setting_value("mail_smtp_password", DEFAULT_NOTIFICATION_SETTINGS["smtp_password"])
+    settings = {
+        "enabled": parse_bool(get_setting_value("mail_enabled", "0"), DEFAULT_NOTIFICATION_SETTINGS["enabled"]),
+        "smtp_host": get_setting_value("mail_smtp_host", DEFAULT_NOTIFICATION_SETTINGS["smtp_host"]),
+        "smtp_port": parse_smtp_port(get_setting_value("mail_smtp_port", str(DEFAULT_NOTIFICATION_SETTINGS["smtp_port"])), DEFAULT_NOTIFICATION_SETTINGS["smtp_port"]),
+        "smtp_username": get_setting_value("mail_smtp_username", DEFAULT_NOTIFICATION_SETTINGS["smtp_username"]),
+        "smtp_password": smtp_password if include_secret else "",
+        "smtp_password_set": bool(smtp_password),
+        "smtp_use_tls": parse_bool(get_setting_value("mail_smtp_use_tls", "1"), DEFAULT_NOTIFICATION_SETTINGS["smtp_use_tls"]),
+        "smtp_use_ssl": parse_bool(get_setting_value("mail_smtp_use_ssl", "0"), DEFAULT_NOTIFICATION_SETTINGS["smtp_use_ssl"]),
+        "from_name": get_setting_value("mail_from_name", DEFAULT_NOTIFICATION_SETTINGS["from_name"]),
+        "from_email": get_setting_value("mail_from_email", DEFAULT_NOTIFICATION_SETTINGS["from_email"]),
+        "to_addresses": get_setting_value("mail_to_addresses", DEFAULT_NOTIFICATION_SETTINGS["to_addresses"]),
+        "cc_addresses": get_setting_value("mail_cc_addresses", DEFAULT_NOTIFICATION_SETTINGS["cc_addresses"]),
+        "subject_bloquear": get_setting_value("mail_subject_bloquear", DEFAULT_NOTIFICATION_SETTINGS["subject_bloquear"]),
+        "subject_desbloquear": get_setting_value("mail_subject_desbloquear", DEFAULT_NOTIFICATION_SETTINGS["subject_desbloquear"]),
+        "subject_novedad": get_setting_value("mail_subject_novedad", DEFAULT_NOTIFICATION_SETTINGS["subject_novedad"]),
+        "subject_incidencia": get_setting_value("mail_subject_incidencia", DEFAULT_NOTIFICATION_SETTINGS["subject_incidencia"]),
+    }
+    return settings
+
+
+def save_notification_settings(payload: dict):
+    current = get_notification_settings(include_secret=True)
+
+    enabled = bool(payload.get("enabled", current["enabled"]))
+    smtp_host = safe_text(payload.get("smtp_host", current["smtp_host"]))
+    smtp_port = parse_smtp_port(payload.get("smtp_port", current["smtp_port"]), current["smtp_port"])
+    smtp_username = safe_text(payload.get("smtp_username", current["smtp_username"]))
+    smtp_password_new = payload.get("smtp_password", None)
+    smtp_password = current["smtp_password"] if smtp_password_new in (None, "") else str(smtp_password_new)
+    smtp_use_tls = bool(payload.get("smtp_use_tls", current["smtp_use_tls"]))
+    smtp_use_ssl = bool(payload.get("smtp_use_ssl", current["smtp_use_ssl"]))
+    from_name = safe_text(payload.get("from_name", current["from_name"]))
+    from_email = safe_text(payload.get("from_email", current["from_email"])).lower()
+    to_addresses = safe_text(payload.get("to_addresses", current["to_addresses"]))
+    cc_addresses = safe_text(payload.get("cc_addresses", current["cc_addresses"]))
+    subject_bloquear = safe_text(payload.get("subject_bloquear", current["subject_bloquear"]))
+    subject_desbloquear = safe_text(payload.get("subject_desbloquear", current["subject_desbloquear"]))
+    subject_novedad = safe_text(payload.get("subject_novedad", current["subject_novedad"]))
+    subject_incidencia = safe_text(payload.get("subject_incidencia", current["subject_incidencia"]))
+
+    if enabled:
+        if not smtp_host:
+            return False, "SMTP host es obligatorio cuando mail esta habilitado"
+        if not split_email_list(to_addresses):
+            return False, "Debes cargar al menos un destinatario TO cuando mail esta habilitado"
+        if smtp_use_ssl and smtp_use_tls:
+            return False, "No puedes activar SSL y TLS al mismo tiempo"
+
+    set_setting_value("mail_enabled", "1" if enabled else "0")
+    set_setting_value("mail_smtp_host", smtp_host)
+    set_setting_value("mail_smtp_port", str(smtp_port))
+    set_setting_value("mail_smtp_username", smtp_username)
+    set_setting_value("mail_smtp_password", smtp_password)
+    set_setting_value("mail_smtp_use_tls", "1" if smtp_use_tls else "0")
+    set_setting_value("mail_smtp_use_ssl", "1" if smtp_use_ssl else "0")
+    set_setting_value("mail_from_name", from_name)
+    set_setting_value("mail_from_email", from_email)
+    set_setting_value("mail_to_addresses", to_addresses)
+    set_setting_value("mail_cc_addresses", cc_addresses)
+    set_setting_value("mail_subject_bloquear", subject_bloquear or DEFAULT_NOTIFICATION_SETTINGS["subject_bloquear"])
+    set_setting_value("mail_subject_desbloquear", subject_desbloquear or DEFAULT_NOTIFICATION_SETTINGS["subject_desbloquear"])
+    set_setting_value("mail_subject_novedad", subject_novedad or DEFAULT_NOTIFICATION_SETTINGS["subject_novedad"])
+    set_setting_value("mail_subject_incidencia", subject_incidencia or DEFAULT_NOTIFICATION_SETTINGS["subject_incidencia"])
+
+    return True, None
+
+
+def get_notification_subject(action_type: str, settings: dict) -> str:
+    action = safe_text(action_type, upper=True)
+    mapping = {
+        "BLOQUEAR": settings.get("subject_bloquear", DEFAULT_NOTIFICATION_SETTINGS["subject_bloquear"]),
+        "DESBLOQUEAR": settings.get("subject_desbloquear", DEFAULT_NOTIFICATION_SETTINGS["subject_desbloquear"]),
+        "NOVEDAD": settings.get("subject_novedad", DEFAULT_NOTIFICATION_SETTINGS["subject_novedad"]),
+        "INCIDENCIA": settings.get("subject_incidencia", DEFAULT_NOTIFICATION_SETTINGS["subject_incidencia"]),
+    }
+    return mapping.get(action, f"[Registro] Nuevo evento {action}")
+
+
+def build_notification_body(item: BlockRequest) -> str:
+    lines = [
+        "Se registro un nuevo evento en el sistema.",
+        "",
+        f"ID: {item.id}",
+        f"Accion: {item.action_type}",
+        f"Fecha sistema (GMT-3): {item.created_at_system.isoformat()}",
+        f"Fecha evento (GMT-3): {item.event_datetime.isoformat()}",
+        f"Patente primaria: {item.patente_primaria}",
+        f"Patente secundaria: {item.patente_secundaria or '-'}",
+        f"Bitren: {item.bitren or '-'}",
+        f"Tipo unidad: {item.tipo_unidad}",
+        f"DNI: {item.dni}",
+        f"Nombre: {item.nombre}",
+        f"Transporte: {item.transporte}",
+        f"Base: {item.base_descripcion or '-'}",
+        f"Nro carga: {item.carga_nro or '-'}",
+        f"Autorizado por: {item.authorized_by_user or '-'}",
+        f"Usuario sistema: {item.usuario_sistema or '-'}",
+        f"IP origen: {item.ip_origen or '-'}",
+        "",
+        "Motivo:",
+        item.motivo or "-",
+    ]
+    return "\n".join(lines)
+
+
+def send_notification_email(item: BlockRequest) -> tuple[bool, str | None]:
+    settings = get_notification_settings(include_secret=True)
+    if not settings["enabled"]:
+        return True, None
+
+    to_addresses = split_email_list(settings["to_addresses"])
+    cc_addresses = split_email_list(settings["cc_addresses"])
+    if not to_addresses:
+        return False, "No hay destinatarios TO configurados"
+
+    smtp_host = safe_text(settings["smtp_host"])
+    if not smtp_host:
+        return False, "SMTP host no configurado"
+
+    sender_email = safe_text(settings["from_email"]).lower() or safe_text(settings["smtp_username"]).lower()
+    if not sender_email:
+        return False, "No hay from_email ni smtp_username configurado"
+
+    message = EmailMessage()
+    message["Subject"] = get_notification_subject(item.action_type, settings)
+    message["From"] = f"{safe_text(settings['from_name'])} <{sender_email}>" if safe_text(settings["from_name"]) else sender_email
+    message["To"] = ", ".join(to_addresses)
+    if cc_addresses:
+        message["Cc"] = ", ".join(cc_addresses)
+    message.set_content(build_notification_body(item), subtype="plain", charset="utf-8")
+
+    recipients = to_addresses + cc_addresses
+    smtp_port = parse_smtp_port(settings["smtp_port"], 587)
+    smtp_username = safe_text(settings["smtp_username"])
+    smtp_password = str(settings["smtp_password"] or "")
+    use_tls = bool(settings["smtp_use_tls"])
+    use_ssl = bool(settings["smtp_use_ssl"])
+
+    try:
+        if use_ssl:
+            with smtplib.SMTP_SSL(smtp_host, smtp_port, timeout=20) as server:
+                if smtp_username:
+                    server.login(smtp_username, smtp_password)
+                server.send_message(message, from_addr=sender_email, to_addrs=recipients)
+        else:
+            with smtplib.SMTP(smtp_host, smtp_port, timeout=20) as server:
+                server.ehlo()
+                if use_tls:
+                    server.starttls()
+                    server.ehlo()
+                if smtp_username:
+                    server.login(smtp_username, smtp_password)
+                server.send_message(message, from_addr=sender_email, to_addrs=recipients)
+    except Exception as exc:
+        return False, str(exc)
+
+    return True, None
+
+
 def validate_password_strength(password: str, policy: dict) -> str | None:
     if len(password) < policy["min_length"]:
         return f"La clave debe tener al menos {policy['min_length']} caracteres"
@@ -1032,6 +1237,21 @@ def ensure_settings_defaults():
     ensure_setting_default("password_require_symbol", "1" if DEFAULT_PASSWORD_POLICY["require_symbol"] else "0")
     ensure_setting_default("password_expires_days", str(DEFAULT_PASSWORD_POLICY["expires_days"]))
     ensure_setting_default("role_permissions_json", json.dumps(clone_default_permissions(), ensure_ascii=True, sort_keys=True))
+    ensure_setting_default("mail_enabled", "1" if DEFAULT_NOTIFICATION_SETTINGS["enabled"] else "0")
+    ensure_setting_default("mail_smtp_host", DEFAULT_NOTIFICATION_SETTINGS["smtp_host"])
+    ensure_setting_default("mail_smtp_port", str(DEFAULT_NOTIFICATION_SETTINGS["smtp_port"]))
+    ensure_setting_default("mail_smtp_username", DEFAULT_NOTIFICATION_SETTINGS["smtp_username"])
+    ensure_setting_default("mail_smtp_password", DEFAULT_NOTIFICATION_SETTINGS["smtp_password"])
+    ensure_setting_default("mail_smtp_use_tls", "1" if DEFAULT_NOTIFICATION_SETTINGS["smtp_use_tls"] else "0")
+    ensure_setting_default("mail_smtp_use_ssl", "1" if DEFAULT_NOTIFICATION_SETTINGS["smtp_use_ssl"] else "0")
+    ensure_setting_default("mail_from_name", DEFAULT_NOTIFICATION_SETTINGS["from_name"])
+    ensure_setting_default("mail_from_email", DEFAULT_NOTIFICATION_SETTINGS["from_email"])
+    ensure_setting_default("mail_to_addresses", DEFAULT_NOTIFICATION_SETTINGS["to_addresses"])
+    ensure_setting_default("mail_cc_addresses", DEFAULT_NOTIFICATION_SETTINGS["cc_addresses"])
+    ensure_setting_default("mail_subject_bloquear", DEFAULT_NOTIFICATION_SETTINGS["subject_bloquear"])
+    ensure_setting_default("mail_subject_desbloquear", DEFAULT_NOTIFICATION_SETTINGS["subject_desbloquear"])
+    ensure_setting_default("mail_subject_novedad", DEFAULT_NOTIFICATION_SETTINGS["subject_novedad"])
+    ensure_setting_default("mail_subject_incidencia", DEFAULT_NOTIFICATION_SETTINGS["subject_incidencia"])
     db.session.commit()
 
 
@@ -1140,7 +1360,26 @@ def create_request():
     db.session.add(item)
     db.session.commit()
 
-    return jsonify({"message": "Solicitud registrada", "data": serialize_request(item)}), 201
+    mail_sent, mail_error = send_notification_email(item)
+    if not mail_sent:
+        add_audit(
+            principal["username"],
+            "MAIL_NOTIFICATION_ERROR",
+            str(item.id),
+            safe_text(mail_error)[:180] if mail_error else "Error de envio desconocido",
+        )
+        db.session.commit()
+
+    return jsonify(
+        {
+            "message": "Solicitud registrada",
+            "data": serialize_request(item),
+            "mail_notification": {
+                "sent": bool(mail_sent),
+                "error": mail_error,
+            },
+        }
+    ), 201
 
 
 @app.route("/api/evidence/<int:request_id>", methods=["GET"])
@@ -1849,6 +2088,77 @@ def admin_settings_update():
     db.session.commit()
 
     return jsonify({"message": "Politica actualizada", "policy": get_password_policy()})
+
+
+@app.route("/api/admin/notifications", methods=["GET"])
+def admin_notifications_get():
+    principal, error_response, status_code = authenticate_admin_request(required_roles=ROLE_TYPES, required_permission="can_manage_policy")
+    if error_response:
+        return error_response, status_code
+    return jsonify(get_notification_settings(include_secret=False))
+
+
+@app.route("/api/admin/notifications", methods=["PATCH"])
+def admin_notifications_update():
+    principal, error_response, status_code = authenticate_admin_request(required_roles=ROLE_TYPES, required_permission="can_manage_policy")
+    if error_response:
+        return error_response, status_code
+    assert principal is not None
+
+    payload = request.get_json(silent=True) or {}
+    ok, message = save_notification_settings(payload)
+    if not ok:
+        return jsonify({"error": message or "No se pudo guardar configuracion de notificaciones"}), 400
+
+    add_audit(principal["username"], "UPDATE_NOTIFICATION_SETTINGS", "notifications", "Configuracion de mail actualizada")
+    db.session.commit()
+    return jsonify({"message": "Notificaciones actualizadas", "settings": get_notification_settings(include_secret=False)})
+
+
+@app.route("/api/admin/notifications/test", methods=["POST"])
+def admin_notifications_test_send():
+    principal, error_response, status_code = authenticate_admin_request(required_roles=ROLE_TYPES, required_permission="can_manage_policy")
+    if error_response:
+        return error_response, status_code
+    assert principal is not None
+
+    payload = request.get_json(silent=True) or {}
+    action_type = safe_text(payload.get("action_type"), upper=True) or "NOVEDAD"
+    if action_type not in ACTION_TYPES:
+        return jsonify({"error": "Tipo de accion invalido para prueba"}), 400
+
+    item = BlockRequest()
+    item.id = 0
+    item.created_at_system = now_gmt_minus_3()
+    item.event_datetime = now_gmt_minus_3()
+    item.action_type = action_type
+    item.related_request_id = None
+    item.authorized_by_user = None
+    item.carga_nro = "PRUEBA"
+    item.patente_primaria = "TEST123"
+    item.patente_secundaria = ""
+    item.bitren = ""
+    item.tipo_unidad = "Unidad de prueba"
+    item.dni = "00000000"
+    item.nombre = "Usuario de prueba"
+    item.transporte = "Transporte de prueba"
+    item.base_descripcion = "Base de prueba"
+    item.motivo = "Correo de prueba desde configuracion de notificaciones"
+    item.evidence_original_name = None
+    item.evidence_stored_name = None
+    item.ip_origen = "127.0.0.1"
+    item.equipo = "panel-admin"
+    item.usuario_sistema = principal["username"]
+
+    sent, error_message = send_notification_email(item)
+    if not sent:
+        add_audit(principal["username"], "TEST_NOTIFICATION_EMAIL_ERROR", "notifications", safe_text(error_message)[:180] if error_message else "Error de envio")
+        db.session.commit()
+        return jsonify({"error": error_message or "No se pudo enviar mail de prueba"}), 400
+
+    add_audit(principal["username"], "TEST_NOTIFICATION_EMAIL_OK", "notifications", f"action_type={action_type}")
+    db.session.commit()
+    return jsonify({"message": "Mail de prueba enviado"})
 
 
 @app.route("/api/admin/permissions", methods=["GET"])

@@ -40,6 +40,8 @@ App web para registrar bloqueos de unidades y/o choferes.
   - Buscador en registros.
   - Gestion de usuarios: crear, modificar rol/activo y resetear hash.
   - Configuracion de permisos por nivel (que ve y que puede hacer cada rol).
+  - Tab `Notificaciones` para configurar SMTP, destinatarios `TO/CC` y asunto por tipo de accion.
+  - Envio automatico de mail al registrar `BLOQUEAR`, `DESBLOQUEAR`, `NOVEDAD` o `INCIDENCIA`.
 
 ## Stack tecnico
 - Backend: Flask + SQLAlchemy
@@ -190,6 +192,9 @@ python app.py
 - `GET /api/admin/users/password-health?days=7` usuarios vencidos o por vencer (ADMIN)
 - `GET /api/admin/permissions` leer matriz de permisos por nivel
 - `PATCH /api/admin/permissions` actualizar matriz de permisos por nivel
+- `GET /api/admin/notifications` leer configuracion de notificaciones por mail
+- `PATCH /api/admin/notifications` guardar configuracion de notificaciones por mail
+- `POST /api/admin/notifications/test` enviar mail de prueba
 
 ## Nota sobre "usuario de sistema"
 Por seguridad del navegador, no es posible leer automaticamente el usuario del sistema operativo del cliente (Windows/macOS) sin integraciones corporativas especificas (SSO, AD, agente local).
