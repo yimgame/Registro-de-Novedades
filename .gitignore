@@ -1,0 +1,8 @@
+venv/
+.venv/
+__pycache__/
+instance/
+admin_key.hash
+.env/
+.env/*.env
+*.xlsx

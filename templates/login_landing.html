@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Registro de Novedades, Incidencias y Bloqueos</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body data-theme="arcor">
+    <div class="bg-shape shape-a"></div>
+    <div class="bg-shape shape-b"></div>
+
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Acceso al sistema</p>
+          <h1>Registro de Novedades, Incidencias y Bloqueos</h1>
+        </div>
+
+        <div class="theme-box">
+          <label for="themeSelector">Tema</label>
+          <select id="themeSelector">
+            <option value="arcor">Arcor</option>
+            <option value="claro">Claro</option>
+            <option value="oscuro">Oscuro</option>
+          </select>
+        </div>
+      </header>
+
+      <section class="card">
+        <div class="section-head">
+          <h2>Como ingresar</h2>
+        </div>
+
+        <div class="card">
+          <h2>Login obligatorio</h2>
+          <p class="meta">Inicia sesion para habilitar el panel y la carga operativa.</p>
+          <label>
+            Usuario
+            <input type="text" id="landing_admin_user" maxlength="120" placeholder="Ej: admin.jrt" />
+          </label>
+          <label>
+            Clave
+            <input type="password" id="landing_admin_key" maxlength="200" placeholder="Clave" />
+          </label>
+          <div class="actions">
+            <button type="button" id="landingAdminBtn" class="ghost">Ingresar</button>
+            <a href="/admin" class="ghost-link">Ir solo al Login Admin</a>
+          </div>
+          <p id="landingStatus" class="status" role="status"></p>
+        </div>
+      </section>
+    </main>
+
+    <script src="/static/login_landing.js"></script>
+  </body>
+</html>

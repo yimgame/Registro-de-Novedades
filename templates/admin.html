@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Panel de Admin - Registro de Novedades, Incidencias y Bloqueos</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body data-theme="arcor">
+    <div class="bg-shape shape-a"></div>
+    <div class="bg-shape shape-b"></div>
+
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Panel administrativo</p>
+          <h1>Registro de Novedades, Incidencias y Bloqueos</h1>
+        </div>
+
+        <div class="theme-box">
+          <label for="themeSelector">Tema</label>
+          <select id="themeSelector">
+            <option value="arcor">Arcor</option>
+            <option value="claro">Claro</option>
+            <option value="oscuro">Oscuro</option>
+          </select>
+        </div>
+      </header>
+
+      <section class="card">
+        <div id="adminPanel" class="grid two">
+          <label>
+            Usuario
+            <input type="text" id="admin_user" maxlength="120" autocomplete="off" placeholder="admin.jrt" />
+          </label>
+          <label>
+            Clave
+            <input type="password" id="admin_key" maxlength="200" autocomplete="off" placeholder="Clave" />
+          </label>
+        </div>
+
+        <div class="actions">
+          <button type="button" id="adminUnlockBtn" class="ghost">Iniciar panel</button>
+          <button type="button" id="downloadBtn" class="secondary hidden">Bajar Excel</button>
+          <button type="button" id="refreshBtn" class="ghost hidden">Actualizar registros</button>
+          <a href="/operacion" class="ghost-link">Volver a carga</a>
+          <button type="button" id="adminLogoutBtn" class="ghost">Salir</button>
+        </div>
+
+        <div class="search-card">
+          <label>
+            Buscar en registros
+            <input type="text" id="admin_search_query" placeholder="Patente, DNI, nombre, accion..." />
+          </label>
+          <button type="button" id="adminSearchBtn" class="ghost hidden">Buscar</button>
+        </div>
+
+        <p id="metaInfo" class="meta"></p>
+        <p id="status" class="status" role="status"></p>
+        <p id="expiryAlert" class="status warning hidden" role="status"></p>
+      </section>
+
+      <section class="card hidden" id="adminTabsCard">
+        <div id="adminTabs" class="tabs" role="tablist" aria-label="Herramientas admin">
+          <button type="button" class="tab-btn" data-tab="records">Registros</button>
+          <button type="button" class="tab-btn" data-tab="users">Usuarios</button>
+          <button type="button" class="tab-btn" data-tab="policy">Politica</button>
+          <button type="button" class="tab-btn" data-tab="permissions">Permisos</button>
+          <button type="button" class="tab-btn" data-tab="audit">Auditoria</button>
+          <button type="button" class="tab-btn" data-tab="expiry">Vencimientos</button>
+          <button type="button" class="tab-btn" data-tab="force-change">Cambio clave</button>
+        </div>
+      </section>
+
+      <section class="card hidden" id="expiryCard" data-tab-panel="expiry">
+        <div class="section-head">
+          <h2>Vencimientos de clave</h2>
+        </div>
+
+        <div class="grid three">
+          <label>
+            Avisar cuando falten (dias)
+            <input type="number" id="expiry_days_threshold" min="0" max="3650" value="7" />
+          </label>
+          <label>
+            Vencidos ahora
+            <input type="text" id="expiry_count_expired" readonly />
+          </label>
+          <label>
+            Por vencer
+            <input type="text" id="expiry_count_soon" readonly />
+          </label>
+        </div>
+
+        <div class="actions">
+          <button type="button" id="refreshExpiryBtn" class="ghost">Actualizar vencimientos</button>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Usuario</th>
+                <th>Rol</th>
+                <th>Estado</th>
+                <th>Dias restantes</th>
+                <th>Ultimo cambio</th>
+              </tr>
+            </thead>
+            <tbody id="expiryRows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card hidden" id="forceChangeCard" data-tab-panel="force-change">
+        <div class="section-head">
+          <h2>Cambio obligatorio de clave</h2>
+        </div>
+        <div class="grid two">
+          <label>
+            Nueva clave
+            <input type="password" id="force_new_key" maxlength="200" placeholder="Minimo 6 caracteres" />
+          </label>
+          <label>
+            Repetir nueva clave
+            <input type="password" id="force_new_key_2" maxlength="200" placeholder="Repetir clave" />
+          </label>
+        </div>
+        <div class="actions">
+          <button type="button" id="forceChangeBtn" class="ghost">Guardar nueva clave</button>
+        </div>
+      </section>
+
+      <section class="card hidden" id="usersCard" data-tab-panel="users">
+        <div class="section-head">
+          <h2>Usuarios y niveles</h2>
+        </div>
+
+        <div class="grid three">
+          <label>
+            Usuario nuevo
+            <input type="text" id="new_username" maxlength="120" placeholder="supervisor.turno1" />
+          </label>
+          <label>
+            Nivel
+            <select id="new_role">
+              <option value="ADMIN">ADMIN</option>
+              <option value="JRT">JRT</option>
+              <option value="SUPERVISOR">SUPERVISOR</option>
+              <option value="LIDER">LIDER</option>
+              <option value="GERENTE">GERENTE</option>
+              <option value="AUDITOR">AUDITOR</option>
+            </select>
+          </label>
+          <label>
+            Clave inicial
+            <input type="password" id="new_key" maxlength="200" placeholder="Clave inicial" />
+          </label>
+        </div>
+
+        <div class="actions">
+          <button type="button" id="createUserBtn" class="ghost">Crear usuario</button>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Usuario</th>
+                <th>Rol</th>
+                <th>Activo</th>
+                <th>Reset hash</th>
+              </tr>
+            </thead>
+            <tbody id="usersRows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card hidden" id="policyCard" data-tab-panel="policy">
+        <div class="section-head">
+          <h2>Politica de claves</h2>
+        </div>
+
+        <div class="grid two">
+          <label>
+            Longitud minima
+            <input type="number" id="policy_min_length" min="6" max="64" />
+          </label>
+          <label>
+            Expiracion (dias, 0 = sin vencimiento)
+            <input type="number" id="policy_expires_days" min="0" max="3650" />
+          </label>
+        </div>
+
+        <div class="grid two">
+          <label>
+            <input type="checkbox" id="policy_require_uppercase" />
+            Requiere mayuscula
+          </label>
+          <label>
+            <input type="checkbox" id="policy_require_lowercase" />
+            Requiere minuscula
+          </label>
+        </div>
+
+        <div class="grid two">
+          <label>
+            <input type="checkbox" id="policy_require_digit" />
+            Requiere numero
+          </label>
+          <label>
+            <input type="checkbox" id="policy_require_symbol" />
+            Requiere simbolo
+          </label>
+        </div>
+
+        <div class="actions">
+          <button type="button" id="savePolicyBtn" class="ghost">Guardar politica</button>
+          <button type="button" id="forceLegacyRotationBtn" class="ghost">Forzar cambio a cuentas legacy</button>
+        </div>
+      </section>
+
+      <section class="card hidden" id="permissionsCard" data-tab-panel="permissions">
+        <div class="section-head">
+          <h2>Permisos por nivel</h2>
+        </div>
+
+        <p class="meta">Define que puede ver y hacer cada rol.</p>
+
+        <div class="table-wrap">
+          <table>
+            <thead id="permissionsHead"></thead>
+            <tbody id="permissionsRows"></tbody>
+          </table>
+        </div>
+
+        <div class="actions">
+          <button type="button" id="savePermissionsBtn" class="ghost">Guardar permisos</button>
+        </div>
+      </section>
+
+      <section class="card hidden" id="auditCard" data-tab-panel="audit">
+        <div class="section-head">
+          <h2>Auditoria de usuarios</h2>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Fecha</th>
+                <th>Actor</th>
+                <th>Accion</th>
+                <th>Objetivo</th>
+                <th>Detalle</th>
+              </tr>
+            </thead>
+            <tbody id="auditRows"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card hidden" id="recordsCard" data-tab-panel="records">
+        <div class="section-head">
+          <h2>Ultimos registros</h2>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Fecha sistema GMT-3</th>
+                <th>Evento</th>
+                <th>Accion</th>
+                <th>ID relacionado</th>
+                <th>Solicitado por</th>
+                <th>Autorizado por</th>
+                <th>Patente primaria</th>
+                <th>Patente secundaria</th>
+                <th>Bitren</th>
+                <th>DNI</th>
+                <th>Nombre</th>
+                <th>Motivo</th>
+                <th>Prueba</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <script src="/static/admin.js"></script>
+  </body>
+</html>

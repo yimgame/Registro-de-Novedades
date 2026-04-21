@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Registro de Novedades, Incidencias y Bloqueos</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body data-theme="arcor">
+    <div class="bg-shape shape-a"></div>
+    <div class="bg-shape shape-b"></div>
+
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Registro operacional</p>
+          <h1>Registro de Novedades, Incidencias y Bloqueos</h1>
+        </div>
+
+        <div class="theme-box">
+          <label for="themeSelector">Tema</label>
+          <select id="themeSelector">
+            <option value="arcor">Arcor</option>
+            <option value="claro">Claro</option>
+            <option value="oscuro">Oscuro</option>
+          </select>
+        </div>
+      </header>
+
+      <section class="card">
+        <div class="search-card">
+          <label>
+            Buscar linea (patente, DNI, nombre, carga)
+            <input type="text" id="search_query" placeholder="Ej: AB123CD o 30999888" />
+          </label>
+          <button type="button" id="searchBtn" class="ghost">Buscar</button>
+        </div>
+        <div id="searchResults" class="search-results"></div>
+      </section>
+
+      <section class="card">
+        <form id="blockForm">
+          <div class="grid two">
+            <label>
+              Fecha y hora evento *
+              <input type="datetime-local" id="event_datetime" required />
+            </label>
+            <label>
+              Nro Carga (opcional)
+              <input type="text" id="carga_nro" maxlength="50" placeholder="22481234 / 4161234"/>
+            </label>
+          </div>
+
+          <div class="grid two">
+            <label>
+              Accion *
+              <select id="action_type" required>
+                <option value="BLOQUEAR" selected>Bloquear</option>
+                <option value="DESBLOQUEAR">Desbloquear</option>
+                <option value="NOVEDAD">Novedad</option>
+                <option value="INCIDENCIA">Incidencia</option>
+              </select>
+            </label>
+            <label>
+              ID linea asociada (opcional)
+              <input type="number" id="related_request_id" min="1" placeholder="Se completa al elegir una busqueda" />
+            </label>
+          </div>
+
+          <div id="unlockAuthBox" class="grid two hidden">
+            <label>
+              Usuario autorizador (JRT/Supervisor)
+              <input type="text" id="auth_user" maxlength="120" placeholder="Ej: supervisor.turno1" />
+            </label>
+            <label>
+              Clave autorizacion
+              <input type="password" id="auth_key" maxlength="200" placeholder="Clave de usuario" />
+            </label>
+          </div>
+
+          <div class="grid two">
+            <label>
+              Patente primaria *
+              <input type="text" id="patente_primaria" required maxlength="20" autocomplete="off" list="patente_primaria_list" placeholder="Ej: AB123CD" />
+              <datalist id="patente_primaria_list"></datalist>
+            </label>
+            <label>
+              Patente secundaria
+              <input type="text" id="patente_secundaria" maxlength="20" autocomplete="off" list="patente_secundaria_list" placeholder="Ej: AB123CD" />
+              <datalist id="patente_secundaria_list"></datalist>
+            </label>
+          </div>
+
+          <div class="grid two">
+            <label>
+              Bitren
+              <input type="text" id="bitren" maxlength="10" autocomplete="off" list="bitren_list" placeholder="Ej: AB123CD" />
+              <datalist id="bitren_list"></datalist>
+            </label>
+            <label>
+              Tipo unidad *
+              <input type="text" id="tipo_unidad" required maxlength="100" autocomplete="off" list="tipo_unidad_list" placeholder="Ej: Camión" />
+              <datalist id="tipo_unidad_list"></datalist>
+            </label>
+          </div>
+
+          <div class="grid two">
+            <label>
+              DNI *
+              <input type="text" id="dni" required maxlength="20" autocomplete="off" list="dni_list" placeholder="Ej: 30999888" />
+              <datalist id="dni_list"></datalist>
+            </label>
+            <label>
+              Nombre *
+              <input type="text" id="nombre" required maxlength="120" autocomplete="off" list="nombre_list" placeholder="Ej: Juan Pérez" />
+              <datalist id="nombre_list"></datalist>
+            </label>
+          </div>
+
+          <div class="grid two">
+            <label>
+              Transporte *
+              <input type="text" id="transporte" required maxlength="120" autocomplete="off" list="transporte_list" placeholder="Ej: Transporte XYZ" />
+              <datalist id="transporte_list"></datalist>
+            </label>
+            <label>
+              Base
+              <select id="base_descripcion">
+                <option value="">Seleccionar base...</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="grid two">
+            <label>
+              Usuario sistema local
+              <input type="text" id="usuario_sistema" maxlength="120" placeholder="Ej: juan.perez" />
+            </label>
+            <div></div>
+          </div>
+
+          <label>
+            Motivo *
+            <textarea id="motivo" required rows="3" maxlength="1000" placeholder="Ej: Unidad reparada / Pedido operativo"></textarea>
+          </label>
+
+          <label>
+            Prueba del evento (foto/archivo, opcional) Prueba del evento sugerencia de Facu Sandoval SAC
+            <input type="file" id="evidence_file" accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.txt,.doc,.docx,.xls,.xlsx" />
+          </label>
+
+          <input type="hidden" id="equipo" />
+
+          <div class="actions">
+            <button type="submit" id="sendBtn">Enviar</button>
+            <a href="/admin" class="ghost-link">Ir a Admin</a>
+            <button type="button" id="operationLogoutBtn" class="ghost">Salir</button>
+          </div>
+
+          <p id="metaInfo" class="meta"></p>
+          <p id="status" class="status" role="status"></p>
+        </form>
+      </section>
+    </main>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>
