@@ -128,7 +128,7 @@ Tambien se aceptan hashes legacy `SHA-256` (64 hex) para no romper instalaciones
 La app usa `DATABASE_URL` si esta definida, si no usa SQLite local.
 
 ### Crear DB y tablas (Windows)
-Si no tienes la carpeta `instance/` o quieres inicializar el esquema desde cero:
+Crea la db sqlite en carpeta `instance/` para  inicializar el esquema desde cero:
 
 ```powershell
 create_db.bat
