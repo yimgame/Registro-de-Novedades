@@ -56,6 +56,10 @@ App web para registrar bloqueos de unidades y/o choferes.
 ```powershell
 python -m pip install -r requirements.txt
 ```
+## Instalacion
+```powershell
+create_db.bat
+```
 
 ## Ejecucion
 ```powershell
@@ -196,6 +200,7 @@ python app.py
 - `PATCH /api/admin/notifications` guardar configuracion de notificaciones por mail
 - `POST /api/admin/notifications/test` enviar mail de prueba
 
-## Nota sobre "usuario de sistema"
-Por seguridad del navegador, no es posible leer automaticamente el usuario del sistema operativo del cliente (Windows/macOS) sin integraciones corporativas especificas (SSO, AD, agente local).
-La app deja un campo para capturarlo manualmente y lo recuerda en el navegador para siguientes cargas.
+
+
+
+
