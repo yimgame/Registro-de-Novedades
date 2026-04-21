@@ -505,8 +505,9 @@ async function loadUsers() {
         headers: { "Content-Type": "application/json", ...getAuthHeaders() },
         body: JSON.stringify({ key_plain: newKey.trim() }),
       });
+      const body = await response.json().catch(() => ({}));
       if (!response.ok) {
-        showStatus("No se pudo resetear hash.", "error");
+        showStatus(body.error || "No se pudo resetear hash.", "error");
         return;
       }
       showStatus(`Hash reseteado para ${user.username}. Cambiara clave en primer login.`, "ok");
