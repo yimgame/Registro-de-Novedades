@@ -194,15 +194,31 @@
           <button type="button" id="refreshExpiryBtn" class="ghost">Actualizar vencimientos</button>
         </div>
 
+        <div class="table-toolbar">
+          <div class="table-toolbar-left">
+            <label for="expiryPageSize">Filas por pagina</label>
+            <select id="expiryPageSize" class="table-page-size">
+              <option value="10">10</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select>
+          </div>
+          <div class="table-toolbar-right">
+            <button type="button" id="expiryPrevBtn" class="ghost">Anterior</button>
+            <span id="expiryPageInfo" class="meta">Pagina 1 de 1</span>
+            <button type="button" id="expiryNextBtn" class="ghost">Siguiente</button>
+          </div>
+        </div>
+
         <div class="table-wrap">
-          <table>
+          <table class="expiry-table">
             <thead>
               <tr>
-                <th>Usuario</th>
-                <th>Rol</th>
-                <th>Estado</th>
-                <th>Dias restantes</th>
-                <th>Ultimo cambio</th>
+                <th data-sort-key="username">Usuario</th>
+                <th data-sort-key="role">Rol</th>
+                <th data-sort-key="expiry_state">Estado</th>
+                <th data-sort-key="days_until_expiry">Dias restantes</th>
+                <th data-sort-key="last_password_change_at">Ultimo cambio</th>
               </tr>
             </thead>
             <tbody id="expiryRows"></tbody>
@@ -260,14 +276,30 @@
           <button type="button" id="createUserBtn" class="ghost">Crear usuario</button>
         </div>
 
+        <div class="table-toolbar">
+          <div class="table-toolbar-left">
+            <label for="usersPageSize">Filas por pagina</label>
+            <select id="usersPageSize" class="table-page-size">
+              <option value="10">10</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select>
+          </div>
+          <div class="table-toolbar-right">
+            <button type="button" id="usersPrevBtn" class="ghost">Anterior</button>
+            <span id="usersPageInfo" class="meta">Pagina 1 de 1</span>
+            <button type="button" id="usersNextBtn" class="ghost">Siguiente</button>
+          </div>
+        </div>
+
         <div class="table-wrap">
-          <table>
+          <table class="users-table">
             <thead>
               <tr>
-                <th>ID</th>
-                <th>Usuario</th>
-                <th>Rol</th>
-                <th>Activo</th>
+                <th data-sort-key="id">ID</th>
+                <th data-sort-key="username">Usuario</th>
+                <th data-sort-key="role">Rol</th>
+                <th data-sort-key="active">Activo</th>
                 <th>Reset hash</th>
               </tr>
             </thead>
@@ -343,15 +375,32 @@
         <div class="section-head">
           <h2>Auditoria de usuarios</h2>
         </div>
+
+        <div class="table-toolbar">
+          <div class="table-toolbar-left">
+            <label for="auditPageSize">Filas por pagina</label>
+            <select id="auditPageSize" class="table-page-size">
+              <option value="10">10</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select>
+          </div>
+          <div class="table-toolbar-right">
+            <button type="button" id="auditPrevBtn" class="ghost">Anterior</button>
+            <span id="auditPageInfo" class="meta">Pagina 1 de 1</span>
+            <button type="button" id="auditNextBtn" class="ghost">Siguiente</button>
+          </div>
+        </div>
+
         <div class="table-wrap">
-          <table>
+          <table class="audit-table">
             <thead>
               <tr>
-                <th>Fecha</th>
-                <th>Actor</th>
-                <th>Accion</th>
-                <th>Objetivo</th>
-                <th>Detalle</th>
+                <th data-sort-key="created_at">Fecha</th>
+                <th data-sort-key="actor_username">Actor</th>
+                <th data-sort-key="action">Accion</th>
+                <th data-sort-key="target_username">Objetivo</th>
+                <th data-sort-key="details">Detalle</th>
               </tr>
             </thead>
             <tbody id="auditRows"></tbody>
@@ -363,24 +412,41 @@
         <div class="section-head">
           <h2>Ultimos registros</h2>
         </div>
+
+        <div class="table-toolbar">
+          <div class="table-toolbar-left">
+            <label for="recordsPageSize">Filas por pagina</label>
+            <select id="recordsPageSize" class="table-page-size">
+              <option value="10">10</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select>
+          </div>
+          <div class="table-toolbar-right">
+            <button type="button" id="recordsPrevBtn" class="ghost">Anterior</button>
+            <span id="recordsPageInfo" class="meta">Pagina 1 de 1</span>
+            <button type="button" id="recordsNextBtn" class="ghost">Siguiente</button>
+          </div>
+        </div>
+
         <div class="table-wrap">
-          <table>
+          <table class="records-table">
             <thead>
               <tr>
-                <th>ID</th>
-                <th>Fecha sistema GMT-3</th>
-                <th>Evento</th>
-                <th>Accion</th>
-                <th>ID relacionado</th>
-                <th>Solicitado por</th>
-                <th>Autorizado por</th>
-                <th>Patente primaria</th>
-                <th>Patente secundaria</th>
-                <th>Bitren</th>
-                <th>DNI</th>
-                <th>Nombre</th>
-                <th>Motivo</th>
-                <th>Prueba</th>
+                <th data-sort-key="id">ID</th>
+                <th data-sort-key="created_at_system">Fecha sistema GMT-3</th>
+                <th data-sort-key="event_datetime">Evento</th>
+                <th data-sort-key="action_type">Accion</th>
+                <th data-sort-key="related_request_id">ID relacionado</th>
+                <th data-sort-key="requested_by_user">Solicitado por</th>
+                <th data-sort-key="authorized_by_user">Autorizado por</th>
+                <th data-sort-key="patente_primaria">Patente primaria</th>
+                <th data-sort-key="patente_secundaria">Patente secundaria</th>
+                <th data-sort-key="bitren">Bitren</th>
+                <th data-sort-key="dni">DNI</th>
+                <th data-sort-key="nombre">Nombre</th>
+                <th data-sort-key="motivo">Motivo</th>
+                <th data-sort-key="evidence_original_name">Prueba</th>
                 <th>Acciones</th>
               </tr>
             </thead>

@@ -294,6 +294,35 @@ button[disabled] {
   border-radius: 12px;
 }
 
+.table-toolbar {
+  margin: 10px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.table-toolbar-left,
+.table-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.table-toolbar-left label {
+  font-size: 0.84rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.table-page-size {
+  width: auto;
+  min-width: 82px;
+  padding: 6px 8px;
+  border-radius: 10px;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
@@ -307,10 +336,68 @@ td {
   text-align: left;
   vertical-align: top;
   font-size: 0.88rem;
+  white-space: nowrap;
 }
 
 th {
   background: color-mix(in srgb, var(--bg-soft) 50%, var(--card));
+}
+
+th.sortable {
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+  padding-right: 24px;
+}
+
+th.sortable::after {
+  content: "v^";
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0.35;
+  font-size: 0.72rem;
+}
+
+th.sortable[data-sort-dir="asc"]::after {
+  content: "^";
+  opacity: 0.85;
+}
+
+th.sortable[data-sort-dir="desc"]::after {
+  content: "v";
+  opacity: 0.85;
+}
+
+.records-table th:nth-child(1),
+.records-table td:nth-child(1) {
+  min-width: 70px;
+}
+
+.records-table th:nth-child(2),
+.records-table td:nth-child(2),
+.records-table th:nth-child(3),
+.records-table td:nth-child(3) {
+  min-width: 165px;
+}
+
+.records-table th:nth-child(13),
+.records-table td:nth-child(13),
+.audit-table th:nth-child(5),
+.audit-table td:nth-child(5) {
+  min-width: 250px;
+  white-space: normal;
+}
+
+.users-table th:nth-child(2),
+.users-table td:nth-child(2) {
+  min-width: 180px;
+}
+
+.expiry-table th:nth-child(1),
+.expiry-table td:nth-child(1) {
+  min-width: 180px;
 }
 
 .meta,
@@ -389,5 +476,15 @@ th {
 
   .search-card {
     grid-template-columns: 1fr;
+  }
+
+  .table-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .table-toolbar-left,
+  .table-toolbar-right {
+    justify-content: space-between;
   }
 }

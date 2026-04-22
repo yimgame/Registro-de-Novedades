@@ -43,6 +43,22 @@ const refreshExpiryBtn = document.getElementById("refreshExpiryBtn");
 const adminTabsCard = document.getElementById("adminTabsCard");
 const adminTabsEl = document.getElementById("adminTabs");
 const recordsCard = document.getElementById("recordsCard");
+const recordsPageSizeInput = document.getElementById("recordsPageSize");
+const recordsPrevBtn = document.getElementById("recordsPrevBtn");
+const recordsNextBtn = document.getElementById("recordsNextBtn");
+const recordsPageInfo = document.getElementById("recordsPageInfo");
+const usersPageSizeInput = document.getElementById("usersPageSize");
+const usersPrevBtn = document.getElementById("usersPrevBtn");
+const usersNextBtn = document.getElementById("usersNextBtn");
+const usersPageInfo = document.getElementById("usersPageInfo");
+const auditPageSizeInput = document.getElementById("auditPageSize");
+const auditPrevBtn = document.getElementById("auditPrevBtn");
+const auditNextBtn = document.getElementById("auditNextBtn");
+const auditPageInfo = document.getElementById("auditPageInfo");
+const expiryPageSizeInput = document.getElementById("expiryPageSize");
+const expiryPrevBtn = document.getElementById("expiryPrevBtn");
+const expiryNextBtn = document.getElementById("expiryNextBtn");
+const expiryPageInfo = document.getElementById("expiryPageInfo");
 
 const policyMinLengthInput = document.getElementById("policy_min_length");
 const policyExpiresDaysInput = document.getElementById("policy_expires_days");
@@ -90,6 +106,76 @@ const panelByTab = {
   "force-change": forceChangeCard,
 };
 
+const TABLE_PAGE_SIZES = [10, 50, 100];
+
+const tableControllers = {
+  records: {
+    tbodyEl: rowsEl,
+    tableEl: recordsCard ? recordsCard.querySelector("table") : null,
+    pageSizeEl: recordsPageSizeInput,
+    prevBtnEl: recordsPrevBtn,
+    nextBtnEl: recordsNextBtn,
+    pageInfoEl: recordsPageInfo,
+    colSpan: 15,
+    defaultSortKey: "created_at_system",
+    defaultSortDir: "desc",
+    emptyMessage: "Sin registros.",
+    rowBuilder: (item) => buildRecordRow(item),
+  },
+  users: {
+    tbodyEl: usersRowsEl,
+    tableEl: usersCard ? usersCard.querySelector("table") : null,
+    pageSizeEl: usersPageSizeInput,
+    prevBtnEl: usersPrevBtn,
+    nextBtnEl: usersNextBtn,
+    pageInfoEl: usersPageInfo,
+    colSpan: 5,
+    defaultSortKey: "username",
+    defaultSortDir: "asc",
+    emptyMessage: "Sin usuarios.",
+    rowBuilder: (item) => buildUserRow(item),
+  },
+  audit: {
+    tbodyEl: auditRowsEl,
+    tableEl: auditCard ? auditCard.querySelector("table") : null,
+    pageSizeEl: auditPageSizeInput,
+    prevBtnEl: auditPrevBtn,
+    nextBtnEl: auditNextBtn,
+    pageInfoEl: auditPageInfo,
+    colSpan: 5,
+    defaultSortKey: "created_at",
+    defaultSortDir: "desc",
+    emptyMessage: "Sin movimientos de auditoria.",
+    rowBuilder: (item) => buildAuditRow(item),
+  },
+  expiry: {
+    tbodyEl: expiryRowsEl,
+    tableEl: expiryCard ? expiryCard.querySelector("table") : null,
+    pageSizeEl: expiryPageSizeInput,
+    prevBtnEl: expiryPrevBtn,
+    nextBtnEl: expiryNextBtn,
+    pageInfoEl: expiryPageInfo,
+    colSpan: 5,
+    defaultSortKey: "days_until_expiry",
+    defaultSortDir: "asc",
+    emptyMessage: "Sin usuarios vencidos ni por vencer en el umbral seleccionado.",
+    rowBuilder: (item) => buildExpiryRow(item),
+  },
+};
+
+const tableState = Object.keys(tableControllers).reduce((acc, key) => {
+  const controller = tableControllers[key];
+  acc[key] = {
+    rows: [],
+    page: 1,
+    pageSize: controller.pageSizeEl ? Number(controller.pageSizeEl.value || 10) : 10,
+    sortKey: controller.defaultSortKey,
+    sortDir: controller.defaultSortDir,
+    message: "",
+  };
+  return acc;
+}, {});
+
 function showStatus(message, type = "") {
   statusEl.textContent = message;
   statusEl.className = `status ${type}`.trim();
@@ -124,8 +210,203 @@ function getAuthHeaders() {
 
 function createCell(text) {
   const td = document.createElement("td");
-  td.textContent = text || "";
+  td.textContent = text == null ? "" : String(text);
   return td;
+}
+
+function normalizeSortValue(value) {
+  if (value == null || value === "") {
+    return null;
+  }
+
+  if (typeof value === "number") {
+    return value;
+  }
+
+  if (typeof value === "boolean") {
+    return value ? 1 : 0;
+  }
+
+  const asDate = Date.parse(String(value));
+  if (!Number.isNaN(asDate)) {
+    return asDate;
+  }
+
+  const asNumber = Number(value);
+  if (!Number.isNaN(asNumber) && String(value).trim() !== "") {
+    return asNumber;
+  }
+
+  return String(value).toLowerCase();
+}
+
+function sortItems(items, sortKey, sortDir) {
+  if (!sortKey) {
+    return items;
+  }
+
+  const sorted = [...items].sort((a, b) => {
+    const aValue = normalizeSortValue(a[sortKey]);
+    const bValue = normalizeSortValue(b[sortKey]);
+
+    if (aValue == null && bValue == null) {
+      return 0;
+    }
+    if (aValue == null) {
+      return 1;
+    }
+    if (bValue == null) {
+      return -1;
+    }
+
+    if (aValue < bValue) {
+      return sortDir === "asc" ? -1 : 1;
+    }
+    if (aValue > bValue) {
+      return sortDir === "asc" ? 1 : -1;
+    }
+    return 0;
+  });
+
+  return sorted;
+}
+
+function updateSortHeaderUI(tableKey) {
+  const controller = tableControllers[tableKey];
+  const state = tableState[tableKey];
+  if (!controller || !controller.tableEl || !state) {
+    return;
+  }
+
+  const headers = controller.tableEl.querySelectorAll("thead th[data-sort-key]");
+  headers.forEach((header) => {
+    header.classList.add("sortable");
+    header.removeAttribute("data-sort-dir");
+    const sortKey = header.dataset.sortKey;
+    if (sortKey === state.sortKey) {
+      header.setAttribute("data-sort-dir", state.sortDir);
+    }
+  });
+}
+
+function renderTable(tableKey) {
+  const controller = tableControllers[tableKey];
+  const state = tableState[tableKey];
+  if (!controller || !state || !controller.tbodyEl) {
+    return;
+  }
+
+  const sortedRows = sortItems(state.rows, state.sortKey, state.sortDir);
+  const totalRows = sortedRows.length;
+  const safePageSize = TABLE_PAGE_SIZES.includes(state.pageSize) ? state.pageSize : 10;
+  const totalPages = totalRows > 0 ? Math.ceil(totalRows / safePageSize) : 1;
+  const currentPage = Math.min(Math.max(1, state.page), totalPages);
+  const start = (currentPage - 1) * safePageSize;
+  const pageRows = sortedRows.slice(start, start + safePageSize);
+
+  state.page = currentPage;
+  state.pageSize = safePageSize;
+
+  controller.tbodyEl.innerHTML = "";
+
+  if (!totalRows) {
+    const tr = document.createElement("tr");
+    const td = document.createElement("td");
+    td.colSpan = controller.colSpan;
+    td.textContent = state.message || controller.emptyMessage;
+    tr.appendChild(td);
+    controller.tbodyEl.appendChild(tr);
+  } else {
+    pageRows.forEach((row) => {
+      controller.tbodyEl.appendChild(controller.rowBuilder(row));
+    });
+  }
+
+  if (controller.pageInfoEl) {
+    controller.pageInfoEl.textContent = `Pagina ${currentPage} de ${totalPages} (${totalRows} registros)`;
+  }
+  if (controller.prevBtnEl) {
+    controller.prevBtnEl.disabled = currentPage <= 1 || !totalRows;
+  }
+  if (controller.nextBtnEl) {
+    controller.nextBtnEl.disabled = currentPage >= totalPages || !totalRows;
+  }
+  if (controller.pageSizeEl) {
+    controller.pageSizeEl.value = String(safePageSize);
+  }
+
+  updateSortHeaderUI(tableKey);
+}
+
+function setTableRows(tableKey, rows, message = "") {
+  const state = tableState[tableKey];
+  if (!state) {
+    return;
+  }
+  state.rows = Array.isArray(rows) ? rows : [];
+  state.page = 1;
+  state.message = message;
+  renderTable(tableKey);
+}
+
+function setTableMessage(tableKey, message) {
+  setTableRows(tableKey, [], message);
+}
+
+function setupTableInteractions() {
+  Object.keys(tableControllers).forEach((tableKey) => {
+    const controller = tableControllers[tableKey];
+    const state = tableState[tableKey];
+    if (!controller || !state) {
+      return;
+    }
+
+    if (controller.pageSizeEl) {
+      controller.pageSizeEl.addEventListener("change", () => {
+        const pageSize = Number(controller.pageSizeEl.value || 10);
+        state.pageSize = TABLE_PAGE_SIZES.includes(pageSize) ? pageSize : 10;
+        state.page = 1;
+        renderTable(tableKey);
+      });
+    }
+
+    if (controller.prevBtnEl) {
+      controller.prevBtnEl.addEventListener("click", () => {
+        state.page = Math.max(1, state.page - 1);
+        renderTable(tableKey);
+      });
+    }
+
+    if (controller.nextBtnEl) {
+      controller.nextBtnEl.addEventListener("click", () => {
+        state.page += 1;
+        renderTable(tableKey);
+      });
+    }
+
+    if (controller.tableEl) {
+      controller.tableEl.addEventListener("click", (event) => {
+        const header = event.target.closest("th[data-sort-key]");
+        if (!header) {
+          return;
+        }
+
+        const sortKey = header.dataset.sortKey;
+        if (!sortKey) {
+          return;
+        }
+
+        if (state.sortKey === sortKey) {
+          state.sortDir = state.sortDir === "asc" ? "desc" : "asc";
+        } else {
+          state.sortKey = sortKey;
+          state.sortDir = "asc";
+        }
+        state.page = 1;
+        renderTable(tableKey);
+      });
+    }
+  });
 }
 
 function formatFriendlyDate(isoValue) {
@@ -158,6 +439,148 @@ function getExpiryState(item) {
     return item.days_until_expiry <= 0 ? "Vence hoy" : "Vigente";
   }
   return "Sin vencimiento";
+}
+
+function buildRecordRow(row) {
+  const tr = document.createElement("tr");
+  tr.appendChild(createCell(row.id));
+  tr.appendChild(createCell(row.created_at_system));
+  tr.appendChild(createCell(row.event_datetime));
+  tr.appendChild(createCell(row.action_type));
+  tr.appendChild(createCell(row.related_request_id));
+  tr.appendChild(createCell(row.requested_by_user));
+  tr.appendChild(createCell(row.authorized_by_user));
+  tr.appendChild(createCell(row.patente_primaria));
+  tr.appendChild(createCell(row.patente_secundaria));
+  tr.appendChild(createCell(row.bitren));
+  tr.appendChild(createCell(row.dni));
+  tr.appendChild(createCell(row.nombre));
+  tr.appendChild(createCell(row.motivo));
+
+  const evidenceTd = document.createElement("td");
+  if (row.has_evidence) {
+    const evidenceLink = document.createElement("a");
+    evidenceLink.className = "ghost-link";
+    evidenceLink.href = `/api/evidence/${encodeURIComponent(row.id)}?admin_user=${encodeURIComponent(auth.user || "")}&admin_key=${encodeURIComponent(auth.key || "")}`;
+    evidenceLink.textContent = row.evidence_original_name || "Descargar";
+    evidenceTd.appendChild(evidenceLink);
+  } else {
+    evidenceTd.textContent = "-";
+  }
+  tr.appendChild(evidenceTd);
+
+  const actionsTd = document.createElement("td");
+  if (auth.role === "ADMIN") {
+    const deleteBtn = document.createElement("button");
+    deleteBtn.type = "button";
+    deleteBtn.className = "ghost";
+    deleteBtn.textContent = "Eliminar";
+    deleteBtn.addEventListener("click", () => {
+      deleteRecord(row.id).catch((error) => showStatus(error.message || "No se pudo eliminar registro.", "error"));
+    });
+    actionsTd.appendChild(deleteBtn);
+  } else {
+    actionsTd.textContent = "-";
+  }
+  tr.appendChild(actionsTd);
+
+  return tr;
+}
+
+function buildUserRow(user) {
+  const tr = document.createElement("tr");
+
+  tr.appendChild(createCell(user.id));
+  tr.appendChild(createCell(user.username));
+
+  const roleTd = document.createElement("td");
+  const roleSelect = document.createElement("select");
+  roleCatalog.forEach((role) => {
+    const option = document.createElement("option");
+    option.value = role;
+    option.textContent = role;
+    option.selected = role === user.role;
+    roleSelect.appendChild(option);
+  });
+  roleSelect.addEventListener("change", async () => {
+    await fetch(`/api/admin/users/${user.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+      body: JSON.stringify({ role: roleSelect.value }),
+    });
+    showStatus(`Rol actualizado para ${user.username}.`, "ok");
+    await loadAudit();
+    await loadPasswordHealth();
+  });
+  roleTd.appendChild(roleSelect);
+  tr.appendChild(roleTd);
+
+  const activeTd = document.createElement("td");
+  const activeCheckbox = document.createElement("input");
+  activeCheckbox.type = "checkbox";
+  activeCheckbox.checked = Boolean(user.active);
+  activeCheckbox.addEventListener("change", async () => {
+    await fetch(`/api/admin/users/${user.id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+      body: JSON.stringify({ active: activeCheckbox.checked }),
+    });
+    showStatus(`Estado actualizado para ${user.username}.`, "ok");
+    await loadAudit();
+    await loadPasswordHealth();
+  });
+  activeTd.appendChild(activeCheckbox);
+  tr.appendChild(activeTd);
+
+  const resetTd = document.createElement("td");
+  const resetBtn = document.createElement("button");
+  resetBtn.type = "button";
+  resetBtn.className = "ghost";
+  resetBtn.textContent = "Reset hash";
+  resetBtn.addEventListener("click", async () => {
+    const newKey = prompt(`Nueva clave para ${user.username}`) || "";
+    if (!newKey.trim()) {
+      return;
+    }
+    const response = await fetch(`/api/admin/users/${user.id}/reset-key`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+      body: JSON.stringify({ key_plain: newKey.trim() }),
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      showStatus(body.error || "No se pudo resetear hash.", "error");
+      return;
+    }
+    showStatus(`Hash reseteado para ${user.username}. Cambiara clave en primer login.`, "ok");
+    await loadUsers();
+    await loadAudit();
+    await loadPasswordHealth();
+  });
+  resetTd.appendChild(resetBtn);
+  tr.appendChild(resetTd);
+
+  return tr;
+}
+
+function buildAuditRow(row) {
+  const tr = document.createElement("tr");
+  tr.appendChild(createCell(row.created_at));
+  tr.appendChild(createCell(row.actor_username));
+  tr.appendChild(createCell(row.action));
+  tr.appendChild(createCell(row.target_username));
+  tr.appendChild(createCell(row.details));
+  return tr;
+}
+
+function buildExpiryRow(item) {
+  const tr = document.createElement("tr");
+  tr.appendChild(createCell(item.username));
+  tr.appendChild(createCell(item.role));
+  tr.appendChild(createCell(item.expiry_state || getExpiryState(item)));
+  tr.appendChild(createCell(item.days_until_expiry == null ? "-" : String(item.days_until_expiry)));
+  tr.appendChild(createCell(formatFriendlyDate(item.last_password_change_at)));
+  return tr;
 }
 
 function hasNormalAccess() {
@@ -248,9 +671,24 @@ function refreshAdminUI() {
   refreshBtn.classList.toggle("hidden", !enable || !can("can_view_records"));
   adminSearchBtn.classList.toggle("hidden", !enable || !can("can_search_records"));
 
+  if (!enable || !can("can_view_records")) {
+    const message = auth.mustChangePassword
+      ? "Debes cambiar tu clave para ver registros."
+      : "Inicia panel para ver registros.";
+    setTableMessage("records", message);
+  }
+
+  if (!enable || !can("can_manage_users")) {
+    setTableMessage("users", "Sin acceso a gestion de usuarios.");
+  }
+
+  if (!enable || !can("can_view_audit")) {
+    setTableMessage("audit", "Sin acceso a auditoria.");
+  }
+
   if (!enable || !can("can_view_password_health")) {
     expiryAlertEl.classList.add("hidden");
-    expiryRowsEl.innerHTML = "";
+    setTableMessage("expiry", "Sin acceso a vencimientos.");
     expiryCountExpiredInput.value = "-";
     expiryCountSoonInput.value = "-";
   }
@@ -337,30 +775,21 @@ async function verifyAuth(user, key) {
 
 async function loadRows(search = "") {
   if (!hasNormalAccess()) {
-    rowsEl.innerHTML = "";
-    const tr = document.createElement("tr");
-    const td = document.createElement("td");
-    td.colSpan = 15;
-    td.textContent = auth.mustChangePassword
+    setTableMessage(
+      "records",
+      auth.mustChangePassword
       ? "Debes cambiar tu clave para ver registros."
-      : "Inicia panel para ver registros.";
-    tr.appendChild(td);
-    rowsEl.appendChild(tr);
+      : "Inicia panel para ver registros.",
+    );
     return;
   }
 
   if (!can("can_view_records")) {
-    rowsEl.innerHTML = "";
-    const tr = document.createElement("tr");
-    const td = document.createElement("td");
-    td.colSpan = 15;
-    td.textContent = "No tienes permisos para ver registros.";
-    tr.appendChild(td);
-    rowsEl.appendChild(tr);
+    setTableMessage("records", "No tienes permisos para ver registros.");
     return;
   }
 
-  const response = await fetch(`/api/admin/requests?limit=100&q=${encodeURIComponent(search)}`, {
+  const response = await fetch(`/api/admin/requests?limit=500&q=${encodeURIComponent(search)}`, {
     headers: getAuthHeaders(),
   });
 
@@ -371,63 +800,7 @@ async function loadRows(search = "") {
   }
 
   const rows = await response.json();
-  rowsEl.innerHTML = "";
-
-  if (!rows.length) {
-    const tr = document.createElement("tr");
-    const td = document.createElement("td");
-    td.colSpan = 15;
-    td.textContent = "Sin registros.";
-    tr.appendChild(td);
-    rowsEl.appendChild(tr);
-    return;
-  }
-
-  rows.forEach((row) => {
-    const tr = document.createElement("tr");
-    tr.appendChild(createCell(String(row.id)));
-    tr.appendChild(createCell(row.created_at_system));
-    tr.appendChild(createCell(row.event_datetime));
-    tr.appendChild(createCell(row.action_type));
-    tr.appendChild(createCell(String(row.related_request_id || "")));
-    tr.appendChild(createCell(row.requested_by_user));
-    tr.appendChild(createCell(row.authorized_by_user));
-    tr.appendChild(createCell(row.patente_primaria));
-    tr.appendChild(createCell(row.patente_secundaria));
-    tr.appendChild(createCell(row.bitren));
-    tr.appendChild(createCell(row.dni));
-    tr.appendChild(createCell(row.nombre));
-    tr.appendChild(createCell(row.motivo));
-
-    const evidenceTd = document.createElement("td");
-    if (row.has_evidence) {
-      const evidenceLink = document.createElement("a");
-      evidenceLink.className = "ghost-link";
-      evidenceLink.href = `/api/evidence/${encodeURIComponent(row.id)}?admin_user=${encodeURIComponent(auth.user || "")}&admin_key=${encodeURIComponent(auth.key || "")}`;
-      evidenceLink.textContent = row.evidence_original_name || "Descargar";
-      evidenceTd.appendChild(evidenceLink);
-    } else {
-      evidenceTd.textContent = "-";
-    }
-    tr.appendChild(evidenceTd);
-
-    const actionsTd = document.createElement("td");
-    if (auth.role === "ADMIN") {
-      const deleteBtn = document.createElement("button");
-      deleteBtn.type = "button";
-      deleteBtn.className = "ghost";
-      deleteBtn.textContent = "Eliminar";
-      deleteBtn.addEventListener("click", () => {
-        deleteRecord(row.id).catch((error) => showStatus(error.message || "No se pudo eliminar registro.", "error"));
-      });
-      actionsTd.appendChild(deleteBtn);
-    } else {
-      actionsTd.textContent = "-";
-    }
-    tr.appendChild(actionsTd);
-
-    rowsEl.appendChild(tr);
-  });
+  setTableRows("records", rows);
 }
 
 async function deleteRecord(requestId) {
@@ -487,7 +860,7 @@ async function downloadExcel() {
 
 async function loadUsers() {
   if (!hasNormalAccess() || !can("can_manage_users")) {
-    usersRowsEl.innerHTML = "";
+    setTableMessage("users", "Sin acceso a gestion de usuarios.");
     return;
   }
 
@@ -496,127 +869,31 @@ async function loadUsers() {
   });
 
   if (!response.ok) {
-    usersRowsEl.innerHTML = "";
+    setTableMessage("users", "No se pudieron cargar usuarios.");
     return;
   }
 
   const users = await response.json();
-  usersRowsEl.innerHTML = "";
-
-  users.forEach((user) => {
-    const tr = document.createElement("tr");
-
-    tr.appendChild(createCell(String(user.id)));
-    tr.appendChild(createCell(user.username));
-
-    const roleTd = document.createElement("td");
-    const roleSelect = document.createElement("select");
-    roleCatalog.forEach((role) => {
-      const option = document.createElement("option");
-      option.value = role;
-      option.textContent = role;
-      option.selected = role === user.role;
-      roleSelect.appendChild(option);
-    });
-    roleSelect.addEventListener("change", async () => {
-      await fetch(`/api/admin/users/${user.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
-        body: JSON.stringify({ role: roleSelect.value }),
-      });
-      showStatus(`Rol actualizado para ${user.username}.`, "ok");
-      await loadAudit();
-      await loadPasswordHealth();
-    });
-    roleTd.appendChild(roleSelect);
-    tr.appendChild(roleTd);
-
-    const activeTd = document.createElement("td");
-    const activeCheckbox = document.createElement("input");
-    activeCheckbox.type = "checkbox";
-    activeCheckbox.checked = Boolean(user.active);
-    activeCheckbox.addEventListener("change", async () => {
-      await fetch(`/api/admin/users/${user.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
-        body: JSON.stringify({ active: activeCheckbox.checked }),
-      });
-      showStatus(`Estado actualizado para ${user.username}.`, "ok");
-      await loadAudit();
-      await loadPasswordHealth();
-    });
-    activeTd.appendChild(activeCheckbox);
-    tr.appendChild(activeTd);
-
-    const resetTd = document.createElement("td");
-    const resetBtn = document.createElement("button");
-    resetBtn.type = "button";
-    resetBtn.className = "ghost";
-    resetBtn.textContent = "Reset hash";
-    resetBtn.addEventListener("click", async () => {
-      const newKey = prompt(`Nueva clave para ${user.username}`) || "";
-      if (!newKey.trim()) {
-        return;
-      }
-      const response = await fetch(`/api/admin/users/${user.id}/reset-key`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...getAuthHeaders() },
-        body: JSON.stringify({ key_plain: newKey.trim() }),
-      });
-      const body = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        showStatus(body.error || "No se pudo resetear hash.", "error");
-        return;
-      }
-      showStatus(`Hash reseteado para ${user.username}. Cambiara clave en primer login.`, "ok");
-      await loadUsers();
-      await loadAudit();
-      await loadPasswordHealth();
-    });
-    resetTd.appendChild(resetBtn);
-    tr.appendChild(resetTd);
-
-    usersRowsEl.appendChild(tr);
-  });
+  setTableRows("users", users);
 }
 
 async function loadAudit() {
   if (!hasNormalAccess() || !can("can_view_audit")) {
-    auditRowsEl.innerHTML = "";
+    setTableMessage("audit", "Sin acceso a auditoria.");
     return;
   }
 
-  const response = await fetch("/api/admin/audit?limit=120", {
+  const response = await fetch("/api/admin/audit?limit=500", {
     headers: getAuthHeaders(),
   });
 
   if (!response.ok) {
-    auditRowsEl.innerHTML = "";
+    setTableMessage("audit", "No se pudo cargar auditoria.");
     return;
   }
 
   const rows = await response.json();
-  auditRowsEl.innerHTML = "";
-
-  if (!rows.length) {
-    const tr = document.createElement("tr");
-    const td = document.createElement("td");
-    td.colSpan = 5;
-    td.textContent = "Sin movimientos de auditoria.";
-    tr.appendChild(td);
-    auditRowsEl.appendChild(tr);
-    return;
-  }
-
-  rows.forEach((row) => {
-    const tr = document.createElement("tr");
-    tr.appendChild(createCell(row.created_at));
-    tr.appendChild(createCell(row.actor_username));
-    tr.appendChild(createCell(row.action));
-    tr.appendChild(createCell(row.target_username));
-    tr.appendChild(createCell(row.details));
-    auditRowsEl.appendChild(tr);
-  });
+  setTableRows("audit", rows);
 }
 
 async function loadPolicy() {
@@ -763,6 +1040,7 @@ async function forceLegacyRotation() {
 
 async function loadPasswordHealth() {
   if (!hasNormalAccess() || !can("can_view_password_health")) {
+    setTableMessage("expiry", "Sin acceso a vencimientos.");
     return;
   }
 
@@ -772,7 +1050,7 @@ async function loadPasswordHealth() {
   });
 
   if (!response.ok) {
-    expiryRowsEl.innerHTML = "";
+    setTableMessage("expiry", "No se pudieron cargar vencimientos.");
     expiryAlertEl.classList.add("hidden");
     return;
   }
@@ -780,7 +1058,10 @@ async function loadPasswordHealth() {
   const data = await response.json();
   const expired = data.expired || [];
   const soon = data.expiring_soon || [];
-  const rows = [...expired, ...soon];
+  const rows = [...expired, ...soon].map((item) => ({
+    ...item,
+    expiry_state: getExpiryState(item),
+  }));
 
   expiryCountExpiredInput.value = String(data.expired_count ?? expired.length);
   expiryCountSoonInput.value = String(data.expiring_soon_count ?? soon.length);
@@ -797,26 +1078,7 @@ async function loadPasswordHealth() {
     expiryAlertEl.classList.add("hidden");
   }
 
-  expiryRowsEl.innerHTML = "";
-  if (!rows.length) {
-    const tr = document.createElement("tr");
-    const td = document.createElement("td");
-    td.colSpan = 5;
-    td.textContent = "Sin usuarios vencidos ni por vencer en el umbral seleccionado.";
-    tr.appendChild(td);
-    expiryRowsEl.appendChild(tr);
-    return;
-  }
-
-  rows.forEach((item) => {
-    const tr = document.createElement("tr");
-    tr.appendChild(createCell(item.username));
-    tr.appendChild(createCell(item.role));
-    tr.appendChild(createCell(getExpiryState(item)));
-    tr.appendChild(createCell(item.days_until_expiry == null ? "-" : String(item.days_until_expiry)));
-    tr.appendChild(createCell(formatFriendlyDate(item.last_password_change_at)));
-    expiryRowsEl.appendChild(tr);
-  });
+  setTableRows("expiry", rows);
 }
 
 function permissionLabel(permission) {
@@ -1083,6 +1345,8 @@ async function logoutPanel() {
 }
 
 function bootstrap() {
+  setupTableInteractions();
+
   const themeSelector = document.getElementById("themeSelector");
   const savedTheme = localStorage.getItem(THEME_KEY) || "arcor";
   themeSelector.value = savedTheme;
@@ -1191,7 +1455,8 @@ function bootstrap() {
   }
 
   loadMeta().catch(() => null);
-  renderTabs();
+  refreshAdminUI();
+  Object.keys(tableControllers).forEach((tableKey) => renderTable(tableKey));
 }
 
 bootstrap();
