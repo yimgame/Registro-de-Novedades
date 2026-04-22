@@ -111,7 +111,8 @@ if errorlevel 1 (
 echo.
 echo ============================================================
 echo  Instalacion finalizada correctamente.
-echo  Saludo de ambos: con IA el mundo es mejor.
+echo  Saludos del equipo de desarrollo GitHub ChatGPT Codex y Yim
+echo  Recuerden que con IA el mundo es mejor.
 echo  Just coding 4 fun !!!
 echo ============================================================
 pause
