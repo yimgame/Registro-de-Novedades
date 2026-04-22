@@ -60,6 +60,15 @@ python -m pip install -r requirements.txt
 create_db.bat
 ```
 
+## Instalacion Integral (todo en uno)
+Para instalar en una sola ejecucion (entorno, dependencias, pepper, migracion legacy admin hash, admin key opcional y DB):
+
+```powershell
+install_full_setup.bat
+```
+
+El script informa cada paso y finaliza con `pause`.
+
 ## Ejecucion
 ```powershell
 python app.py
