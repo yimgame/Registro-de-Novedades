@@ -4,7 +4,7 @@ from getpass import getpass
 from argon2 import PasswordHasher
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-HASH_FILE = os.path.join(BASE_DIR, "admin_key.hash")
+HASH_FILE = os.getenv("ADMIN_HASH_FILE", os.path.join(BASE_DIR, ".env", "admin_key.hash"))
 AUTH_PEPPER_FILE = os.getenv("AUTH_PEPPER_FILE", os.path.join(BASE_DIR, ".env", "auth_pepper.env"))
 
 password_hasher = PasswordHasher(
@@ -25,7 +25,7 @@ def read_env_value(file_path: str, key: str) -> str:
                 if not line_clean or line_clean.startswith("#") or "=" not in line_clean:
                     continue
                 env_key, env_value = line_clean.split("=", 1)
-                if env_key.strip() == key:
+                if env_key.strip().lstrip("\ufeff") == key:
                     return env_value.strip().strip('"').strip("'")
     except OSError:
         return ""
@@ -60,6 +60,8 @@ def main() -> None:
         raise SystemExit(1)
 
     digest = hash_key(key_1)
+
+    os.makedirs(os.path.dirname(HASH_FILE), exist_ok=True)
 
     with open(HASH_FILE, "w", encoding="utf-8") as file:
         file.write(digest)

@@ -25,9 +25,8 @@ App web para registrar bloqueos de unidades y/o choferes.
 - Temas seleccionables: `arcor`, `claro`, `oscuro`.
 - Seguridad admin por hash:
   - Sistema extendido con tabla de usuarios (`ADMIN`, `JRT`, `SUPERVISOR`, `LIDER`, `GERENTE`, `AUDITOR`) y hash por usuario.
-  - Hash de claves con `PBKDF2-SHA256` + salt por defecto.
-  - Compatibilidad con hashes `SHA-256` legados para migracion progresiva.
-  - Compatibilidad con `admin_key.hash` legado como acceso admin de emergencia.
+  - Hash de claves con `Argon2id` + salt (interno del algoritmo) + `AUTH_PEPPER`.
+  - Verificacion estricta solo para hashes `Argon2id`.
   - El endpoint de Excel y panel admin requieren credenciales validas.
   - Usuarios nuevos o con hash reseteado deben cambiar clave en su primer login.
   - Auditoria visible de acciones de usuarios: alta, cambio de rol/activo, reset hash, login y cambio de clave.
@@ -120,14 +119,13 @@ Alternativa en Windows:
 set_admin_key.bat
 ```
 
-Esto genera el archivo `admin_key.hash`.
+Esto genera el archivo `.env/admin_key.hash`.
 
-Formato actual del hash: `pbkdf2_sha256$iteraciones$salt_hex$hash_hex`.
-Tambien se aceptan hashes legacy `SHA-256` (64 hex) para no romper instalaciones existentes.
+Formato actual del hash: `argon2id`.
 
 ### Comportamiento
-- Sin `admin_key.hash`: funciones admin ocultas (ejemplo: boton de Excel).
-- Con `admin_key.hash`: se muestra panel Admin key.
+- Sin `.env/admin_key.hash`: funciones admin ocultas (ejemplo: boton de Excel).
+- Con `.env/admin_key.hash`: se muestra panel Admin key.
 - Al validar la clave en la web, se habilita boton de descarga Excel.
 
 ## Configuracion de base de datos

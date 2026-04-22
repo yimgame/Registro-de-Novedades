@@ -1,5 +1,3 @@
-import hashlib
-import hmac
 import json
 import os
 import smtplib
@@ -115,10 +113,6 @@ DEFAULT_ROLE_PERMISSIONS = {
         "can_manage_permissions": False,
     },
 }
-PBKDF2_SCHEME = "pbkdf2_sha256"
-PBKDF2_HASH_NAME = "sha256"
-PBKDF2_ITERATIONS = 260000
-PBKDF2_SALT_BYTES = 16
 ARGON2_SCHEME = "argon2id"
 ARGON2_MEMORY_COST = 19456
 ARGON2_TIME_COST = 3
@@ -197,7 +191,7 @@ def read_env_value(file_path: str, key: str) -> str:
                 if not line_clean or line_clean.startswith("#") or "=" not in line_clean:
                     continue
                 env_key, env_value = line_clean.split("=", 1)
-                if env_key.strip() == key:
+                if env_key.strip().lstrip("\ufeff") == key:
                     return env_value.strip().strip('"').strip("'")
     except OSError:
         return ""
@@ -218,7 +212,8 @@ SESSION_SOURCE_KEY = "session_source"
 
 app = Flask(__name__)
 default_sqlite_path = os.path.join(INSTANCE_DIR, "bloqueos.db")
-ADMIN_HASH_FILE = os.getenv("ADMIN_HASH_FILE", os.path.join(BASE_DIR, "admin_key.hash"))
+LEGACY_ADMIN_HASH_FILE = os.path.join(BASE_DIR, "admin_key.hash")
+ADMIN_HASH_FILE = os.getenv("ADMIN_HASH_FILE", os.path.join(ENV_DIR, "admin_key.hash"))
 app.secret_key = os.getenv("APP_SECRET_KEY", "") or os.getenv("FLASK_SECRET_KEY", "") or os.urandom(32).hex()
 app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv(
     "DATABASE_URL",
@@ -517,10 +512,6 @@ def is_legacy_sha256_hash(value: str) -> bool:
     return len(text_value) == 64 and all(ch in "0123456789abcdefABCDEF" for ch in text_value)
 
 
-def legacy_sha256(raw_key: str) -> str:
-    return hashlib.sha256((raw_key or "").encode("utf-8")).hexdigest()
-
-
 def apply_pepper(raw_key: str) -> str:
     value = raw_key or ""
     if not AUTH_PEPPER:
@@ -534,53 +525,12 @@ def hash_key(raw_key: str) -> str:
 
 def verify_key_hash(raw_key: str, stored_hash: str) -> bool:
     value = (stored_hash or "").strip()
-    raw_candidate = raw_key or ""
-    peppered_candidate = apply_pepper(raw_key)
 
     if value.startswith("$argon2id$"):
         try:
             return bool(password_hasher.verify(value, apply_pepper(raw_key)))
         except (VerifyMismatchError, InvalidHash, ValueError):
             return False
-
-    if value.startswith(f"{PBKDF2_SCHEME}$"):
-        parts = value.split("$")
-        if len(parts) != 4:
-            return False
-
-        _, iterations_text, salt_hex, digest_hex = parts
-        try:
-            iterations = int(iterations_text)
-            salt = bytes.fromhex(salt_hex)
-            expected_digest = bytes.fromhex(digest_hex)
-        except (TypeError, ValueError):
-            return False
-
-        if iterations <= 0:
-            return False
-
-        # Compatibilidad: historicamente hubo variantes PBKDF2 con y sin pepper.
-        candidates = [raw_candidate]
-        if peppered_candidate != raw_candidate:
-            candidates.append(peppered_candidate)
-
-        for candidate_text in candidates:
-            candidate = hashlib.pbkdf2_hmac(
-                PBKDF2_HASH_NAME,
-                candidate_text.encode("utf-8"),
-                salt,
-                iterations,
-            )
-            if hmac.compare_digest(candidate, expected_digest):
-                return True
-        return False
-
-    if is_legacy_sha256_hash(value):
-        if hmac.compare_digest(legacy_sha256(raw_candidate), value.lower()):
-            return True
-        if peppered_candidate != raw_candidate and hmac.compare_digest(legacy_sha256(peppered_candidate), value.lower()):
-            return True
-        return False
 
     return False
 
@@ -589,8 +539,6 @@ def get_hash_scheme(stored_hash: str) -> str:
     value = (stored_hash or "").strip()
     if value.startswith("$argon2id$"):
         return ARGON2_SCHEME
-    if value.startswith(f"{PBKDF2_SCHEME}$"):
-        return PBKDF2_SCHEME
     if is_legacy_sha256_hash(value):
         return "legacy_sha256"
     return "unknown"
@@ -949,6 +897,13 @@ def get_days_until_expiry(user: AppUser) -> int | None:
 
 
 def get_admin_hash() -> str | None:
+    if not os.path.exists(ADMIN_HASH_FILE) and os.path.exists(LEGACY_ADMIN_HASH_FILE):
+        try:
+            os.makedirs(os.path.dirname(ADMIN_HASH_FILE), exist_ok=True)
+            os.replace(LEGACY_ADMIN_HASH_FILE, ADMIN_HASH_FILE)
+        except OSError:
+            pass
+
     if not os.path.exists(ADMIN_HASH_FILE):
         return None
 
@@ -964,13 +919,7 @@ def get_admin_hash() -> str | None:
     if content.startswith("$argon2id$"):
         return content
 
-    if content.startswith(f"{PBKDF2_SCHEME}$"):
-        return content
-
-    if not is_legacy_sha256_hash(content):
-        return None
-
-    return content.lower()
+    return None
 
 
 def verify_admin_key(raw_key: str) -> bool:
