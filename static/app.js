@@ -1,5 +1,6 @@
 const THEME_KEY = "bloqueos_theme";
 const USER_KEY = "bloqueos_usuario_sistema";
+const USER_EMAIL_KEY = "bloqueos_usuario_email";
 const AUTH_USER_KEY = "bloqueos_auth_user";
 const AUTH_KEY_KEY = "bloqueos_auth_key";
 const ADMIN_USER_STORE = "bloqueos_admin_user";
@@ -329,6 +330,7 @@ async function submitForm(event) {
     motivo: document.getElementById("motivo").value,
     equipo: document.getElementById("equipo").value,
     usuario_sistema: document.getElementById("usuario_sistema").value,
+    email_usuario: document.getElementById("email_usuario").value,
   };
   const evidenceInput = document.getElementById("evidence_file");
   const evidenceFile = evidenceInput.files && evidenceInput.files.length ? evidenceInput.files[0] : null;
@@ -393,6 +395,11 @@ function bootstrap() {
     document.getElementById("usuario_sistema").value = savedUser;
   }
 
+  const savedUserEmail = localStorage.getItem(USER_EMAIL_KEY);
+  if (savedUserEmail) {
+    document.getElementById("email_usuario").value = savedUserEmail;
+  }
+
   const savedAuthUser = localStorage.getItem(AUTH_USER_KEY) || "";
   const savedAuthKey = localStorage.getItem(AUTH_KEY_KEY) || "";
   document.getElementById("auth_user").value = savedAuthUser;
@@ -401,6 +408,11 @@ function bootstrap() {
   const userInput = document.getElementById("usuario_sistema");
   userInput.addEventListener("change", () => {
     localStorage.setItem(USER_KEY, userInput.value.trim());
+  });
+
+  const userEmailInput = document.getElementById("email_usuario");
+  userEmailInput.addEventListener("change", () => {
+    localStorage.setItem(USER_EMAIL_KEY, userEmailInput.value.trim());
   });
 
   const themeSelector = document.getElementById("themeSelector");

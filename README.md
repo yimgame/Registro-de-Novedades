@@ -1,6 +1,6 @@
 # Sistema de novedades, incidencias y solicitud de bloqueo / desbloqueo - Web responsive
 
-App web para registrar bloqueos de unidades y/o choferes.
+App web para registrar bloqueos de unidades y/o choferes, incidencias y novedades
 
 ## Funcionalidades
 - Formulario responsive con titulo: **Solicitud de bloqueo**.
@@ -51,28 +51,45 @@ App web para registrar bloqueos de unidades y/o choferes.
 ## Requisitos
 - Python 3.10+
 
-## Instalacion
+## Instalacion de desarrollo
 ```powershell
 python -m pip install -r requirements.txt
 ```
-## Instalacion
+## Instalacion db
 ```powershell
 create_db.bat
 ```
 
-## Instalacion Integral (todo en uno)
+## Instalacion Integral produccion (todo en uno)
 Para instalar en una sola ejecucion (entorno, dependencias, pepper, migracion legacy admin hash, admin key opcional y DB):
 
 ```powershell
 install_full_setup.bat
 ```
 
-El script informa cada paso y finaliza con `pause`.
+El script informa cada paso de la instalacion.
 
 ## Ejecucion
 ```powershell
 python app.py
 ```
+
+## Compilar a EXE (doble click)
+Se incluye script para generar un ejecutable standalone de Windows con PyInstaller:
+
+```powershell
+build_exe.bat
+```
+
+Resultado:
+- `dist/RegistroNovedades.exe`
+- `dist/Registro de novedades.exe`
+
+Notas:
+- El EXE incluye dependencias, templates, static y `data.xlsx` inicial.
+- Al ejecutar por primera vez, si no existe `data.xlsx` al lado del EXE, se crea automaticamente.
+- La DB SQLite y evidencias se guardan en `instance/` junto al EXE (persisten entre reinicios).
+- Para configuraciones (`AUTH_PEPPER`, hash admin, etc.), usar carpeta `.env/` junto al EXE.
 
 Si usas `run_app.bat`, el script ahora:
 - Crea/activa `venv` si hace falta.
@@ -206,8 +223,4 @@ python app.py
 - `GET /api/admin/notifications` leer configuracion de notificaciones por mail
 - `PATCH /api/admin/notifications` guardar configuracion de notificaciones por mail
 - `POST /api/admin/notifications/test` enviar mail de prueba
-
-
-
-
 

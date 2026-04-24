@@ -1,9 +1,12 @@
 import json
 import os
+import shutil
 import smtplib
 import subprocess
+import sys
 import tempfile
 from datetime import datetime, timedelta, timezone
+from email.utils import parseaddr
 from email.message import EmailMessage
 from io import BytesIO
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -143,14 +146,41 @@ DEFAULT_NOTIFICATION_SETTINGS = {
     "subject_incidencia": "[Incidencia] Nueva solicitud registrada",
 }
 
-BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-INSTANCE_DIR = os.path.join(BASE_DIR, "instance")
-os.makedirs(INSTANCE_DIR, exist_ok=True)
-ENV_DIR = os.path.join(BASE_DIR, ".env")
-AUTH_PEPPER_FILE = os.getenv("AUTH_PEPPER_FILE", os.path.join(ENV_DIR, "auth_pepper.env"))
-REFERENCE_DATA_FILE = os.path.join(BASE_DIR, "data.xlsx")
+def get_runtime_base_dir() -> str:
+    if getattr(sys, "frozen", False):
+        return os.path.dirname(sys.executable)
+    return os.path.abspath(os.path.dirname(__file__))
+
+
+def get_bundle_base_dir() -> str:
+    return getattr(sys, "_MEIPASS", os.path.abspath(os.path.dirname(__file__)))
+
+
+RUNTIME_BASE_DIR = get_runtime_base_dir()
+BUNDLE_BASE_DIR = get_bundle_base_dir()
+INSTANCE_DIR = os.path.join(RUNTIME_BASE_DIR, "instance")
+ENV_DIR = os.path.join(RUNTIME_BASE_DIR, ".env")
+REFERENCE_DATA_FILE = os.getenv("REFERENCE_DATA_FILE", os.path.join(RUNTIME_BASE_DIR, "data.xlsx"))
+BUNDLED_REFERENCE_DATA_FILE = os.path.join(BUNDLE_BASE_DIR, "data.xlsx")
 EVIDENCE_DIR = os.path.join(INSTANCE_DIR, "evidences")
+
+os.makedirs(INSTANCE_DIR, exist_ok=True)
+os.makedirs(ENV_DIR, exist_ok=True)
 os.makedirs(EVIDENCE_DIR, exist_ok=True)
+
+
+def ensure_reference_file_exists():
+    if os.path.exists(REFERENCE_DATA_FILE):
+        return
+    if os.path.exists(BUNDLED_REFERENCE_DATA_FILE):
+        try:
+            shutil.copyfile(BUNDLED_REFERENCE_DATA_FILE, REFERENCE_DATA_FILE)
+        except OSError:
+            pass
+
+
+ensure_reference_file_exists()
+AUTH_PEPPER_FILE = os.getenv("AUTH_PEPPER_FILE", os.path.join(ENV_DIR, "auth_pepper.env"))
 REFERENCE_CACHE = {
     "mtime": None,
     "bases": [],
@@ -210,9 +240,13 @@ SESSION_USERNAME_KEY = "session_username"
 SESSION_ROLE_KEY = "session_role"
 SESSION_SOURCE_KEY = "session_source"
 
-app = Flask(__name__)
+app = Flask(
+    __name__,
+    template_folder=os.path.join(BUNDLE_BASE_DIR, "templates"),
+    static_folder=os.path.join(BUNDLE_BASE_DIR, "static"),
+)
 default_sqlite_path = os.path.join(INSTANCE_DIR, "bloqueos.db")
-LEGACY_ADMIN_HASH_FILE = os.path.join(BASE_DIR, "admin_key.hash")
+LEGACY_ADMIN_HASH_FILE = os.path.join(RUNTIME_BASE_DIR, "admin_key.hash")
 ADMIN_HASH_FILE = os.getenv("ADMIN_HASH_FILE", os.path.join(ENV_DIR, "admin_key.hash"))
 app.secret_key = os.getenv("APP_SECRET_KEY", "") or os.getenv("FLASK_SECRET_KEY", "") or os.urandom(32).hex()
 app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv(
@@ -666,6 +700,23 @@ def split_email_list(raw_value: str) -> list[str]:
     return values
 
 
+def normalize_email(value: object) -> str:
+    text_value = safe_text(value).lower()
+    if not text_value:
+        return ""
+
+    _, parsed = parseaddr(text_value)
+    email_value = safe_text(parsed).lower()
+    if not email_value or "@" not in email_value:
+        return ""
+
+    local_part, _, domain_part = email_value.partition("@")
+    if not local_part or not domain_part or "." not in domain_part:
+        return ""
+
+    return email_value
+
+
 def parse_smtp_port(value: object, default: int = 587) -> int:
     try:
         port = int(str(value))
@@ -757,7 +808,7 @@ def get_notification_subject(action_type: str, settings: dict) -> str:
     return mapping.get(action, f"[Registro] Nuevo evento {action}")
 
 
-def build_notification_body(item: BlockRequest) -> str:
+def build_notification_body(item: BlockRequest, requester_email: str | None = None) -> str:
     lines = [
         "Se registro un nuevo evento en el sistema.",
         "",
@@ -775,6 +826,7 @@ def build_notification_body(item: BlockRequest) -> str:
         f"Base: {item.base_descripcion or '-'}",
         f"Nro carga: {item.carga_nro or '-'}",
         f"Autorizado por: {item.authorized_by_user or '-'}",
+        f"Email solicitante: {requester_email or '-'}",
         f"Usuario sistema: {item.usuario_sistema or '-'}",
         f"IP origen: {item.ip_origen or '-'}",
         "",
@@ -784,13 +836,16 @@ def build_notification_body(item: BlockRequest) -> str:
     return "\n".join(lines)
 
 
-def send_notification_email(item: BlockRequest) -> tuple[bool, str | None]:
+def send_notification_email(item: BlockRequest, requester_email: str | None = None) -> tuple[bool, str | None]:
     settings = get_notification_settings(include_secret=True)
     if not settings["enabled"]:
         return True, None
 
     to_addresses = split_email_list(settings["to_addresses"])
     cc_addresses = split_email_list(settings["cc_addresses"])
+    requester_copy = normalize_email(requester_email)
+    if requester_copy and requester_copy not in to_addresses and requester_copy not in cc_addresses:
+        cc_addresses.append(requester_copy)
     if not to_addresses:
         return False, "No hay destinatarios TO configurados"
 
@@ -808,7 +863,7 @@ def send_notification_email(item: BlockRequest) -> tuple[bool, str | None]:
     message["To"] = ", ".join(to_addresses)
     if cc_addresses:
         message["Cc"] = ", ".join(cc_addresses)
-    message.set_content(build_notification_body(item), subtype="plain", charset="utf-8")
+    message.set_content(build_notification_body(item, requester_copy or None), subtype="plain", charset="utf-8")
 
     recipients = to_addresses + cc_addresses
     smtp_port = parse_smtp_port(settings["smtp_port"], 587)
@@ -1226,6 +1281,7 @@ def create_request():
     principal, error_response, status_code = authenticate_operation_session()
     if error_response:
         return error_response, status_code
+    assert principal is not None
 
     is_multipart = request.content_type and "multipart/form-data" in request.content_type.lower()
     payload = request.form.to_dict() if is_multipart else (request.get_json(silent=True) or {})
@@ -1276,6 +1332,9 @@ def create_request():
 
     forwarded_for = request.headers.get("X-Forwarded-For", "")
     ip_origen = forwarded_for.split(",")[0].strip() if forwarded_for else request.remote_addr
+    requester_email = safe_text(payload.get("email_usuario")).lower()
+    if requester_email and not normalize_email(requester_email):
+        return jsonify({"error": "Email solicitante invalido"}), 400
 
     evidence_original_name = None
     evidence_stored_name = None
@@ -1309,7 +1368,7 @@ def create_request():
     db.session.add(item)
     db.session.commit()
 
-    mail_sent, mail_error = send_notification_email(item)
+    mail_sent, mail_error = send_notification_email(item, requester_email=requester_email)
     if not mail_sent:
         add_audit(
             principal["username"],
@@ -2154,8 +2213,9 @@ with app.app_context():
 if __name__ == "__main__":
     ssl_cert = os.getenv("SSL_CERT_FILE", "").strip()
     ssl_key = os.getenv("SSL_KEY_FILE", "").strip()
+    debug_mode = os.getenv("FLASK_DEBUG", "0").strip().lower() in {"1", "true", "yes", "on"}
     ssl_context = None
     if ssl_cert and ssl_key and os.path.exists(ssl_cert) and os.path.exists(ssl_key):
         ssl_context = (ssl_cert, ssl_key)
 
-    app.run(host="0.0.0.0", port=5000, debug=True, ssl_context=ssl_context)
+    app.run(host="0.0.0.0", port=5000, debug=debug_mode, ssl_context=ssl_context)
