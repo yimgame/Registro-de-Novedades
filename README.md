@@ -74,6 +74,24 @@ El script informa cada paso de la instalacion.
 python app.py
 ```
 
+## Ejecucion en produccion (sin warning de Flask)
+Usar un servidor WSGI, por ejemplo Waitress (recomendado en Windows).
+
+Opcion 1 (recomendada):
+```powershell
+run_app.bat
+```
+El script ya inicia con Waitress.
+
+Opcion 2 (manual):
+```powershell
+python -m waitress --host=0.0.0.0 --port=5000 app:app
+```
+
+Notas:
+- Si ejecutas `python app.py`, ahora intentara usar Waitress automaticamente cuando no hay debug ni TLS directo.
+- Si defines `FLASK_DEBUG=1` o usas `SSL_CERT_FILE` + `SSL_KEY_FILE`, se usa Flask app.run (modo desarrollo/diagnostico).
+
 ## Compilar a EXE (doble click)
 Se incluye script para generar un ejecutable standalone de Windows con PyInstaller:
 

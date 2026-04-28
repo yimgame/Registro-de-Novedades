@@ -67,7 +67,8 @@ if exist "requirements.txt" (
   echo ADVERTENCIA: No existe requirements.txt. Se omite instalacion.
 )
 
-echo [5/5] Lanzando app...
+echo [5/5] Lanzando app con Waitress (WSGI produccion)...
+set "USE_WAITRESS=1"
 python app.py
 set "APP_EXIT_CODE=%ERRORLEVEL%"
 

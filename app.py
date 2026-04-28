@@ -1,6 +1,8 @@
 import json
+import importlib
 import os
 import shutil
+import socket
 import smtplib
 import subprocess
 import sys
@@ -145,6 +147,45 @@ DEFAULT_NOTIFICATION_SETTINGS = {
     "subject_novedad": "[Novedad] Nueva solicitud registrada",
     "subject_incidencia": "[Incidencia] Nueva solicitud registrada",
 }
+
+
+def get_local_ipv4_addresses() -> list[str]:
+    addresses: set[str] = {"127.0.0.1"}
+
+    try:
+        for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+            ip = str(info[4][0])
+            if ip and not ip.startswith("127."):
+                addresses.add(ip)
+    except OSError:
+        pass
+
+    try:
+        # Detecta la IP local preferida para salida de red sin enviar trafico.
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
+            probe.connect(("8.8.8.8", 80))
+            ip = probe.getsockname()[0]
+            if ip and not ip.startswith("127."):
+                addresses.add(ip)
+    except OSError:
+        pass
+
+    return sorted(addresses)
+
+
+def print_access_urls(host: str, port: int):
+    if host in {"0.0.0.0", "::"}:
+        print(f" * Running on http://127.0.0.1:{port}")
+        for ip in get_local_ipv4_addresses():
+            if ip != "127.0.0.1":
+                print(f" * Running on http://{ip}:{port}")
+        return
+
+    if host in {"localhost", "127.0.0.1"}:
+        print(f" * Running on http://127.0.0.1:{port}")
+        return
+
+    print(f" * Running on http://{host}:{port}")
 
 def get_runtime_base_dir() -> str:
     if getattr(sys, "frozen", False):
@@ -2214,8 +2255,25 @@ if __name__ == "__main__":
     ssl_cert = os.getenv("SSL_CERT_FILE", "").strip()
     ssl_key = os.getenv("SSL_KEY_FILE", "").strip()
     debug_mode = os.getenv("FLASK_DEBUG", "0").strip().lower() in {"1", "true", "yes", "on"}
+    host = os.getenv("HOST", "0.0.0.0").strip() or "0.0.0.0"
+    port = int(os.getenv("PORT", "5000"))
     ssl_context = None
     if ssl_cert and ssl_key and os.path.exists(ssl_cert) and os.path.exists(ssl_key):
         ssl_context = (ssl_cert, ssl_key)
 
-    app.run(host="0.0.0.0", port=5000, debug=debug_mode, ssl_context=ssl_context)
+    use_waitress = os.getenv("USE_WAITRESS", "1").strip().lower() in {"1", "true", "yes", "on"}
+
+    # En produccion Windows, usar Waitress evita el warning del servidor de desarrollo.
+    if use_waitress and not debug_mode and ssl_context is None:
+        try:
+            serve = importlib.import_module("waitress").serve
+
+            threads = max(2, int(os.getenv("WAITRESS_THREADS", "8")))
+            print_access_urls(host, port)
+            serve(app, host=host, port=port, threads=threads)
+            sys.exit(0)
+        except Exception:
+            # Si Waitress no esta disponible, se mantiene fallback al server de Flask.
+            pass
+
+    app.run(host=host, port=port, debug=debug_mode, ssl_context=ssl_context)
